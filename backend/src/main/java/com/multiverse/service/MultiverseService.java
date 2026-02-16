@@ -6,32 +6,43 @@ import com.multiverse.model.Universe;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class MultiverseService {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // Construtor - configura o RestTemplate UMA VEZ
+    public MultiverseService() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10000); // 10 segundos
+        factory.setReadTimeout(10000);
+        
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     /**
      * Lista personagens de um universo
      */
-    @Cacheable(value = "characters", key = "#universe + '-' + #limit")
     public List<Character> getCharacters(Universe universe, int limit) {
         try {
+            log.info("Buscando {} personagens de {}", limit, universe);
+            
             if (universe == Universe.POKEMON) {
                 return getPokemonCharacters(limit);
             } else if (universe == Universe.DIGIMON) {
                 return getDigimonCharacters(limit);
             }
+            
             return Collections.emptyList();
+            
         } catch (Exception e) {
             log.error("Error fetching characters from {}", universe, e);
             return Collections.emptyList();
@@ -41,7 +52,6 @@ public class MultiverseService {
     /**
      * Busca personagem por nome
      */
-    @Cacheable(value = "character", key = "#universe + '-' + #name")
     public Character getCharacterByName(Universe universe, String name) {
         try {
             if (universe == Universe.POKEMON) {
@@ -70,7 +80,6 @@ public class MultiverseService {
         Map<String, ComparisonResult.StatComparison> statsDiff = new HashMap<>();
         int total1 = 0, total2 = 0;
 
-        // Compara stats
         Set<String> allStats = new HashSet<>();
         if (char1.getStats() != null) allStats.addAll(char1.getStats().keySet());
         if (char2.getStats() != null) allStats.addAll(char2.getStats().keySet());
@@ -110,6 +119,8 @@ public class MultiverseService {
     // === POKEMON API ===
     private List<Character> getPokemonCharacters(int limit) throws Exception {
         String url = "https://pokeapi.co/api/v2/pokemon?limit=" + limit;
+        log.info("Chamando: {}", url);
+        
         JsonNode response = objectMapper.readTree(restTemplate.getForObject(url, String.class));
         
         List<Character> characters = new ArrayList<>();
@@ -117,6 +128,8 @@ public class MultiverseService {
             String name = result.get("name").asText();
             characters.add(getPokemonByName(name));
         }
+        
+        log.info("Retornados {} pokémons", characters.size());
         return characters;
     }
 
@@ -179,7 +192,6 @@ public class MultiverseService {
     }
 
     private Character parseDigimon(JsonNode digi) {
-        // Digimon API não tem stats detalhados, vamos gerar valores baseados no level
         String level = digi.get("level").asText();
         Map<String, Integer> stats = generateDigimonStats(level);
 

@@ -11,23 +11,37 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * REST Controller para Multiverse Data Explorer
- */
 @Slf4j
 @RestController
 @RequestMapping("/api/multiverse")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 @Tag(name = "Multiverse Explorer", description = "Explore dados de múltiplos universos")
 public class MultiverseController {
 
     private final MultiverseService multiverseService;
+
+    // === ADICIONE ESTE MÉTODO ===
+    @Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                registry.addMapping("/**")
+                        .allowedOrigins("*")
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                        .allowedHeaders("*");
+            }
+        };
+    }
+    // === FIM DO MÉTODO NOVO ===
 
     @GetMapping("/universes")
     @Operation(summary = "Listar universos disponíveis", description = "Retorna todos os universos que podem ser explorados")
@@ -37,6 +51,7 @@ public class MultiverseController {
                 .collect(Collectors.toList());
         return ResponseEntity.ok(universes);
     }
+
 
     @GetMapping("/{universe}/characters")
     @Operation(summary = "Listar personagens", description = "Retorna personagens de um universo específico")

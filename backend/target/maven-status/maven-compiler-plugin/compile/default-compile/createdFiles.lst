@@ -1,0 +1,16 @@
+com\multiverse\dto\ComparisonResult$StatComparison.class
+com\multiverse\config\CacheConfig.class
+com\multiverse\controller\MultiverseController.class
+com\multiverse\model\Universe.class
+com\multiverse\config\WebConfig.class
+com\multiverse\model\Character.class
+com\multiverse\dto\ComparisonResult$StatComparison$StatComparisonBuilder.class
+com\multiverse\dto\ComparisonResult.class
+com\multiverse\MultiverseExplorerApplication.class
+com\multiverse\model\Character$CharacterBuilder.class
+com\multiverse\service\MultiverseService.class
+com\multiverse\config\OpenApiConfig.class
+com\multiverse\controller\MultiverseController$HealthResponse.class
+com\multiverse\controller\MultiverseController$1.class
+com\multiverse\dto\ComparisonResult$ComparisonResultBuilder.class
+com\multiverse\controller\MultiverseController$UniverseInfo.class
