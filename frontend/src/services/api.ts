@@ -1,50 +1,130 @@
-import axios from 'axios';
-import { Character, Universe, ComparisonResult, UniverseType } from '../types';
+import axios from "axios";
+import { Character, UniverseType, ComparisonResult } from "../types";
 
-const API_URL = 'http://localhost:8080/api/multiverse';
+// Base URL da API (ajuste conforme necessário)
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8080/api/multiverse";
 
+// Configuração do axios
 const api = axios.create({
-  baseURL: API_URL,
-  timeout: 10000,
+  baseURL: API_BASE_URL,
+  timeout: 15000,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
+// Interceptor para logs (desenvolvimento)
+api.interceptors.request.use(
+  (config) => {
+    console.log("🚀 Request:", config.method?.toUpperCase(), config.url);
+    return config;
+  },
+  (error) => {
+    console.error("❌ Request Error:", error);
+    return Promise.reject(error);
+  },
+);
+
+api.interceptors.response.use(
+  (response) => {
+    console.log("✅ Response:", response.status, response.config.url);
+    return response;
+  },
+  (error) => {
+    console.error("❌ Response Error:", error.response?.status, error.message);
+    return Promise.reject(error);
+  },
+);
+
 export const multiverseService = {
-  // Listar universos
-  async getUniverses(): Promise<Universe[]> {
-    const response = await api.get<Universe[]>('/universes');
-    return response.data;
+  /**
+   * Lista todos os universos disponíveis
+   */
+  async getUniverses() {
+    try {
+      const response = await api.get("/universes");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching universes:", error);
+      throw error;
+    }
   },
 
-  // Listar personagens de um universo
-  async getCharacters(universe: UniverseType, limit: number = 20): Promise<Character[]> {
-    const response = await api.get<Character[]>(`/${universe}/characters`, {
-      params: { limit }
-    });
-    return response.data;
+  /**
+   * Busca personagens de um universo específico
+   */
+  async getCharacters(
+    universe: UniverseType,
+    limit: number = 50,
+  ): Promise<Character[]> {
+    try {
+      const response = await api.get(`/${universe}/characters`, {
+        params: { limit },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching characters from ${universe}:`, error);
+      throw error;
+    }
   },
 
-  // Buscar personagem por nome
-  async getCharacter(universe: UniverseType, name: string): Promise<Character> {
-    const response = await api.get<Character>(`/${universe}/characters/${name}`);
-    return response.data;
+  /**
+   * Busca um personagem específico por nome
+   */
+  async getCharacterByName(
+    universe: UniverseType,
+    name: string,
+  ): Promise<Character> {
+    try {
+      const response = await api.get(`/${universe}/characters/${name}`);
+      return response.data;
+    } catch (error) {
+      console.error(
+        `Error fetching character ${name} from ${universe}:`,
+        error,
+      );
+      throw error;
+    }
   },
 
-  // Comparar dois personagens
+  /**
+   * Compara dois personagens
+   */
   async compareCharacters(
     universe1: UniverseType,
     name1: string,
     universe2: UniverseType,
-    name2: string
+    name2: string,
   ): Promise<ComparisonResult> {
-    const response = await api.post<ComparisonResult>('/compare', null, {
-      params: { universe1, name1, universe2, name2 }
-    });
-    return response.data;
+    try {
+      const response = await api.post("/compare", null, {
+        params: {
+          universe1,
+          name1,
+          universe2,
+          name2,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error comparing characters:", error);
+      throw error;
+    }
   },
 
-  // Health check
-  async healthCheck(): Promise<any> {
-    const response = await api.get('/health');
-    return response.data;
-  }
+  /**
+   * Health check da API
+   */
+  async healthCheck() {
+    try {
+      const response = await api.get("/health");
+      return response.data;
+    } catch (error) {
+      console.error("Error checking API health:", error);
+      throw error;
+    }
+  },
 };
+
+export default multiverseService;

@@ -28,20 +28,6 @@ public class MultiverseController {
 
     private final MultiverseService multiverseService;
 
-    // === ADICIONE ESTE MÉTODO ===
-    @Bean
-    public WebMvcConfigurer corsConfigurer() {
-        return new WebMvcConfigurer() {
-            @Override
-            public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/**")
-                        .allowedOrigins("*")
-                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                        .allowedHeaders("*");
-            }
-        };
-    }
-    // === FIM DO MÉTODO NOVO ===
 
     @GetMapping("/universes")
     @Operation(summary = "Listar universos disponíveis", description = "Retorna todos os universos que podem ser explorados")
