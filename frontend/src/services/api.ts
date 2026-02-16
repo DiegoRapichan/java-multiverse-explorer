@@ -1,9 +1,10 @@
 import axios from "axios";
 import { Character, UniverseType, ComparisonResult } from "../types";
 
-// Base URL da API (ajuste conforme necessário)
+// Base URL da API - Usando casting para evitar erro do TypeScript
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8080/api/multiverse";
+  (import.meta as any).env.VITE_API_URL ||
+  "http://localhost:8080/api/multiverse";
 
 // Configuração do axios
 const api = axios.create({
