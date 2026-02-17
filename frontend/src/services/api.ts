@@ -7,8 +7,8 @@ const API_URL =
 export const api = {
   getCharacters: async (
     universe: Universe,
-    limit: number = 50,
-    offset: number = 0,
+    limit = 50,
+    offset = 0,
   ): Promise<Character[]> => {
     const response = await axios.get(`${API_URL}/${universe}/characters`, {
       params: { limit, offset },
@@ -26,13 +26,10 @@ export const api = {
     return response.data;
   },
 
-  // ✅ CORRIGIDO: manda lista completa de até 8 personagens
   compareCharacters: async (
     characters: Character[],
   ): Promise<ComparisonResult> => {
-    const response = await axios.post(`${API_URL}/compare`, {
-      characters, // ← backend espera { characters: [...] }
-    });
+    const response = await axios.post(`${API_URL}/compare`, { characters });
     return response.data;
   },
 };

@@ -236,7 +236,8 @@ public class MultiverseService {
 
     // =========================================================
     // JIKAN — todos os universos via MyAnimeList
-    // Dragon Ball (813), Naruto (20), Demon Slayer (38000) + outros
+    // Poder = favorites (MAL) + fallback por posição na lista
+    // Personagens principais aparecem primeiro → posição alta = mais poder
     // =========================================================
     private List<Character> fetchJikanCharacters(Universe universe, int limit, int offset) {
         try {
@@ -250,26 +251,43 @@ public class MultiverseService {
 
             List<Character> characters = new ArrayList<>();
             if (data != null && data.isArray()) {
+                // Tamanho total para calcular fallback por posição
+                int totalSize = data.size();
                 int count = 0;
-                for (int i = offset; i < data.size() && count < limit; i++, count++) {
+
+                for (int i = offset; i < totalSize && count < limit; i++, count++) {
                     JsonNode node = data.get(i);
                     JsonNode charNode = node.get("character");
 
                     Map<String, String> stats = new HashMap<>();
 
-                    // Favorites como proxy de poder
-                    if (node.has("favorites") && !node.get("favorites").isNull())
-                        stats.put("favorites", node.get("favorites").asText());
+                    // Favorites como proxy de poder principal
+                    int favorites = 0;
+                    if (node.has("favorites") && !node.get("favorites").isNull()) {
+                        favorites = node.get("favorites").asInt(0);
+                    }
 
-                    // Voice actors count como stat extra
-                    if (node.has("voice_actors") && node.get("voice_actors").isArray())
-                        stats.put("voice_actors", String.valueOf(node.get("voice_actors").size() * 5));
+                    if (favorites > 0) {
+                        // Tem favorites reais — usa direto
+                        stats.put("popularity", String.valueOf(favorites));
+                    } else {
+                        // Fallback: posição invertida na lista
+                        // Posição 0 (personagem principal) = maior poder
+                        // Posição N (personagem secundário) = menor poder
+                        int positionPower = Math.max(10, (totalSize - i) * 10);
+                        stats.put("popularity", String.valueOf(positionPower));
+                    }
+
+                    // Role como stat extra: Main > Supporting
+                    String role = node.get("role").asText();
+                    int rolePower = role.equalsIgnoreCase("Main") ? 500 : 100;
+                    stats.put("role_power", String.valueOf(rolePower));
 
                     characters.add(Character.builder()
                             .id(charNode.get("mal_id").asText())
                             .name(charNode.get("name").asText())
                             .imageUrl(charNode.get("images").get("jpg").get("image_url").asText())
-                            .type(node.get("role").asText())
+                            .type(role)
                             .stats(stats)
                             .build());
                 }
