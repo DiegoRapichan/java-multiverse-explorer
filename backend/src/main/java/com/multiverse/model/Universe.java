@@ -1,18 +1,49 @@
 package com.multiverse.model;
 
 /**
- * Universos disponíveis para exploração
+ * Enum representando todos os universos de anime disponíveis
  */
 public enum Universe {
-    POKEMON("Pokémon", "https://pokeapi.co/api/v2"),
-    DIGIMON("Digimon", "https://digimon-api.vercel.app/api/digimon");
+    // Originais
+    POKEMON("Pokemon", "https://pokeapi.co/api/v2", "pokemon"),
+    DIGIMON("Digimon", "https://digimon-api.vercel.app/api", "digimon"),
+    
+    // Dragon Ball Franchise
+    DRAGON_BALL("Dragon Ball", "https://web.dragonball-api.com/api", "characters"),
+    
+    // Naruto Franchise
+    NARUTO("Naruto", "https://api-dattebayo.vercel.app/anime", "characters"),
+    
+    // Demon Slayer
+    DEMON_SLAYER("Demon Slayer", "https://demon-slayer-api.onrender.com/v1", null),
+    
+    // Via Jikan API (MyAnimeList) - ID dos animes
+    MY_HERO_ACADEMIA("My Hero Academia", "https://api.jikan.moe/v4", "31964"),
+    ONE_PIECE("One Piece", "https://api.jikan.moe/v4", "21"),
+    ATTACK_ON_TITAN("Attack on Titan", "https://api.jikan.moe/v4", "16498"),
+    DEATH_NOTE("Death Note", "https://api.jikan.moe/v4", "1535"),
+    HUNTER_X_HUNTER("Hunter x Hunter", "https://api.jikan.moe/v4", "11061"),
+    FULLMETAL_ALCHEMIST("Fullmetal Alchemist", "https://api.jikan.moe/v4", "5114"),
+    BLEACH("Bleach", "https://api.jikan.moe/v4", "269"),
+    ONE_PUNCH_MAN("One Punch Man", "https://api.jikan.moe/v4", "30276"),
+    TOKYO_GHOUL("Tokyo Ghoul", "https://api.jikan.moe/v4", "22319"),
+    SWORD_ART_ONLINE("Sword Art Online", "https://api.jikan.moe/v4", "11757"),
+    FAIRY_TAIL("Fairy Tail", "https://api.jikan.moe/v4", "6702"),
+    BLACK_CLOVER("Black Clover", "https://api.jikan.moe/v4", "34572"),
+    JUJUTSU_KAISEN("Jujutsu Kaisen", "https://api.jikan.moe/v4", "40748"),
+    CHAINSAW_MAN("Chainsaw Man", "https://api.jikan.moe/v4", "44511"),
+    SPY_X_FAMILY("Spy x Family", "https://api.jikan.moe/v4", "50265"),
+    YU_YU_HAKUSHO("Yu Yu Hakusho", "https://api.jikan.moe/v4", "392"),
+    SAINT_SEIYA("Saint Seiya", "https://api.jikan.moe/v4", "1254");
 
     private final String displayName;
     private final String apiBaseUrl;
+    private final String endpoint; // Para Jikan, é o anime ID
 
-    Universe(String displayName, String apiBaseUrl) {
+    Universe(String displayName, String apiBaseUrl, String endpoint) {
         this.displayName = displayName;
         this.apiBaseUrl = apiBaseUrl;
+        this.endpoint = endpoint;
     }
 
     public String getDisplayName() {
@@ -21,5 +52,25 @@ public enum Universe {
 
     public String getApiBaseUrl() {
         return apiBaseUrl;
+    }
+
+    public String getEndpoint() {
+        return endpoint;
+    }
+
+    public boolean isJikanApi() {
+        return apiBaseUrl.contains("jikan.moe");
+    }
+
+    public boolean isDragonBallApi() {
+        return this == DRAGON_BALL;
+    }
+
+    public boolean isNarutoApi() {
+        return this == NARUTO;
+    }
+
+    public boolean isDemonSlayerApi() {
+        return this == DEMON_SLAYER;
     }
 }
