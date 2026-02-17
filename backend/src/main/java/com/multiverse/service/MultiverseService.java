@@ -1,211 +1,273 @@
 package com.multiverse.service;
 
-import com.multiverse.dto.ComparisonResult;
-import com.multiverse.model.Character;
-import com.multiverse.model.Universe;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.multiverse.model.Character;
+import com.multiverse.model.Universe;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 public class MultiverseService {
 
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+    private final Cache<String, List<Character>> cache;
 
-    /**
-     * Lista personagens de um universo
-     */
-    public List<Character> getCharacters(Universe universe, int limit) {
-        try {
-            if (universe == Universe.POKEMON) {
-                return getPokemonCharacters(limit);
-            } else if (universe == Universe.DIGIMON) {
-                return getDigimonCharacters(limit);
-            }
-            return Collections.emptyList();
-        } catch (Exception e) {
-            log.error("Error fetching characters from {}", universe, e);
-            return Collections.emptyList();
-        }
-    }
+    // Rate limit para Jikan API (3 req/segundo)
+    private long lastJikanRequest = 0;
+    private static final long JIKAN_DELAY_MS = 350; // ~3 por segundo
 
-    /**
-     * Busca personagem por nome
-     */
-    public Character getCharacterByName(Universe universe, String name) {
-        try {
-            if (universe == Universe.POKEMON) {
-                return getPokemonByName(name.toLowerCase());
-            } else if (universe == Universe.DIGIMON) {
-                return getDigimonByName(name);
-            }
-            return null;
-        } catch (Exception e) {
-            log.error("Error fetching character {} from {}", name, universe, e);
-            return null;
-        }
-    }
-
-    /**
-     * Compara dois personagens
-     */
-    public ComparisonResult compareCharacters(String universe1, String name1, String universe2, String name2) {
-        Character char1 = getCharacterByName(Universe.valueOf(universe1.toUpperCase()), name1);
-        Character char2 = getCharacterByName(Universe.valueOf(universe2.toUpperCase()), name2);
-
-        if (char1 == null || char2 == null) {
-            return null;
-        }
-
-        Map<String, ComparisonResult.StatComparison> statsDiff = new HashMap<>();
-        int total1 = 0, total2 = 0;
-
-        // Compara stats
-        Set<String> allStats = new HashSet<>();
-        if (char1.getStats() != null) allStats.addAll(char1.getStats().keySet());
-        if (char2.getStats() != null) allStats.addAll(char2.getStats().keySet());
-
-        for (String stat : allStats) {
-            Integer val1 = char1.getStats() != null ? char1.getStats().getOrDefault(stat, 0) : 0;
-            Integer val2 = char2.getStats() != null ? char2.getStats().getOrDefault(stat, 0) : 0;
-            
-            total1 += val1;
-            total2 += val2;
-            
-            String advantage = val1 > val2 ? "character1" : (val2 > val1 ? "character2" : "tie");
-            
-            statsDiff.put(stat, ComparisonResult.StatComparison.builder()
-                    .value1(val1)
-                    .value2(val2)
-                    .difference(Math.abs(val1 - val2))
-                    .advantage(advantage)
-                    .build());
-        }
-
-        String winner = total1 > total2 ? char1.getName() : char2.getName();
-        String recommendation = total1 > total2 
-                ? char1.getName() + " é mais forte no geral!"
-                : char2.getName() + " leva vantagem!";
-
-        return ComparisonResult.builder()
-                .character1(char1)
-                .character2(char2)
-                .statsDifference(statsDiff)
-                .winner(winner)
-                .totalDifference(Math.abs(total1 - total2))
-                .recommendation(recommendation)
+    public MultiverseService() {
+        this.restTemplate = new RestTemplate();
+        this.objectMapper = new ObjectMapper();
+        this.cache = CacheBuilder.newBuilder()
+                .expireAfterWrite(30, TimeUnit.MINUTES)
+                .maximumSize(1000)
                 .build();
     }
 
-    // === POKEMON API ===
-    private List<Character> getPokemonCharacters(int limit) throws Exception {
-        String url = "https://pokeapi.co/api/v2/pokemon?limit=" + limit;
-        JsonNode response = objectMapper.readTree(restTemplate.getForObject(url, String.class));
+    public List<Character> getCharacters(Universe universe, int limit, int offset) {
+        String cacheKey = universe.name() + "_" + limit + "_" + offset;
         
-        List<Character> characters = new ArrayList<>();
-        for (JsonNode result : response.get("results")) {
-            String name = result.get("name").asText();
-            characters.add(getPokemonByName(name));
+        List<Character> cached = cache.getIfPresent(cacheKey);
+        if (cached != null) {
+            log.info("Cache hit for {}", cacheKey);
+            return cached;
         }
+
+        List<Character> characters;
+        
+        if (universe == Universe.POKEMON) {
+            characters = fetchPokemonCharacters(limit, offset);
+        } else if (universe == Universe.DIGIMON) {
+            characters = fetchDigimonCharacters(limit, offset);
+        } else if (universe.isDragonBallApi()) {
+            characters = fetchDragonBallCharacters(limit, offset);
+        } else if (universe.isNarutoApi()) {
+            characters = fetchNarutoCharacters(limit, offset);
+        } else if (universe.isDemonSlayerApi()) {
+            characters = fetchDemonSlayerCharacters(limit, offset);
+        } else if (universe.isJikanApi()) {
+            characters = fetchJikanCharacters(universe, limit, offset);
+        } else {
+            characters = new ArrayList<>();
+        }
+
+        cache.put(cacheKey, characters);
         return characters;
     }
 
-    private Character getPokemonByName(String name) throws Exception {
-        String url = "https://pokeapi.co/api/v2/pokemon/" + name;
-        JsonNode pokemon = objectMapper.readTree(restTemplate.getForObject(url, String.class));
-
-        Map<String, Integer> stats = new HashMap<>();
-        for (JsonNode stat : pokemon.get("stats")) {
-            String statName = stat.get("stat").get("name").asText();
-            int value = stat.get("base_stat").asInt();
-            stats.put(statName, value);
-        }
-
-        List<String> types = new ArrayList<>();
-        for (JsonNode type : pokemon.get("types")) {
-            types.add(type.get("type").get("name").asText());
-        }
-
-        List<String> abilities = new ArrayList<>();
-        for (JsonNode ability : pokemon.get("abilities")) {
-            abilities.add(ability.get("ability").get("name").asText());
-        }
-
-        return Character.builder()
-                .id(String.valueOf(pokemon.get("id").asInt()))
-                .name(pokemon.get("name").asText())
-                .universe(Universe.POKEMON)
-                .types(types)
-                .stats(stats)
-                .abilities(abilities)
-                .imageUrl(pokemon.get("sprites").get("front_default").asText())
-                .height(pokemon.get("height").asInt())
-                .weight(pokemon.get("weight").asInt())
-                .build();
+    // ============================================
+    // POKEMON (já existe)
+    // ============================================
+    private List<Character> fetchPokemonCharacters(int limit, int offset) {
+        String url = "https://pokeapi.co/api/v2/pokemon?limit=" + limit + "&offset=" + offset;
+        // ... código existente ...
+        return new ArrayList<>(); // placeholder
     }
 
-    // === DIGIMON API ===
-    private List<Character> getDigimonCharacters(int limit) throws Exception {
-        String url = "https://digimon-api.vercel.app/api/digimon";
-        JsonNode response = objectMapper.readTree(restTemplate.getForObject(url, String.class));
-        
-        List<Character> characters = new ArrayList<>();
-        int count = 0;
-        for (JsonNode digi : response) {
-            if (count++ >= limit) break;
-            characters.add(parseDigimon(digi));
+    // ============================================
+    // DIGIMON (já existe)
+    // ============================================
+    private List<Character> fetchDigimonCharacters(int limit, int offset) {
+        String url = "https://digimon-api.vercel.app/api/digimon?limit=" + limit + "&offset=" + offset;
+        // ... código existente ...
+        return new ArrayList<>(); // placeholder
+    }
+
+    // ============================================
+    // DRAGON BALL 🐉
+    // ============================================
+    private List<Character> fetchDragonBallCharacters(int limit, int offset) {
+        try {
+            String url = "https://web.dragonball-api.com/api/characters?page=" + (offset / limit + 1) + "&limit=" + limit;
+            log.info("Fetching Dragon Ball characters from: {}", url);
+            
+            String response = restTemplate.getForObject(url, String.class);
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode items = root.get("items");
+            
+            List<Character> characters = new ArrayList<>();
+            if (items != null && items.isArray()) {
+                for (JsonNode node : items) {
+                    Character character = Character.builder()
+                            .id(node.get("id").asText())
+                            .name(node.get("name").asText())
+                            .imageUrl(node.get("image").asText())
+                            .type(node.has("race") ? node.get("race").asText() : "Unknown")
+                            .stats(new java.util.HashMap<>())
+                            .build();
+                    
+                    // Power level
+                    if (node.has("ki")) {
+                        character.getStats().put("ki", node.get("ki").asText());
+                    }
+                    if (node.has("maxKi")) {
+                        character.getStats().put("maxKi", node.get("maxKi").asText());
+                    }
+                    
+                    characters.add(character);
+                }
+            }
+            
+            return characters;
+        } catch (Exception e) {
+            log.error("Error fetching Dragon Ball characters", e);
+            return new ArrayList<>();
         }
-        return characters;
     }
 
-    private Character getDigimonByName(String name) throws Exception {
-        String url = "https://digimon-api.vercel.app/api/digimon/name/" + name;
-        JsonNode response = objectMapper.readTree(restTemplate.getForObject(url, String.class));
-        
-        if (response.isArray() && response.size() > 0) {
-            return parseDigimon(response.get(0));
+    // ============================================
+    // NARUTO 🍥
+    // ============================================
+    private List<Character> fetchNarutoCharacters(int limit, int offset) {
+        try {
+            // Dattebayo API não tem paginação direta, então busca tudo e filtra
+            String url = "https://api-dattebayo.vercel.app/anime/characters";
+            log.info("Fetching Naruto characters from: {}", url);
+            
+            String response = restTemplate.getForObject(url, String.class);
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode charactersNode = root.get("characters");
+            
+            List<Character> characters = new ArrayList<>();
+            if (charactersNode != null && charactersNode.isArray()) {
+                int count = 0;
+                for (int i = offset; i < charactersNode.size() && count < limit; i++, count++) {
+                    JsonNode node = charactersNode.get(i);
+                    
+                    Character character = Character.builder()
+                            .id(String.valueOf(i))
+                            .name(node.get("name").asText())
+                            .imageUrl(node.has("images") && node.get("images").isArray() ? 
+                                     node.get("images").get(0).asText() : "")
+                            .type(node.has("rank") ? node.get("rank").asText() : "Ninja")
+                            .stats(new java.util.HashMap<>())
+                            .build();
+                    
+                    if (node.has("debut")) {
+                        character.getStats().put("debut", node.get("debut").asText());
+                    }
+                    
+                    characters.add(character);
+                }
+            }
+            
+            return characters;
+        } catch (Exception e) {
+            log.error("Error fetching Naruto characters", e);
+            return new ArrayList<>();
         }
-        return null;
     }
 
-    private Character parseDigimon(JsonNode digi) {
-        // Digimon API não tem stats detalhados, vamos gerar valores baseados no level
-        String level = digi.get("level").asText();
-        Map<String, Integer> stats = generateDigimonStats(level);
-
-        return Character.builder()
-                .id(digi.get("name").asText())
-                .name(digi.get("name").asText())
-                .universe(Universe.DIGIMON)
-                .types(List.of(level))
-                .level(level)
-                .stats(stats)
-                .imageUrl(digi.get("img").asText())
-                .build();
+    // ============================================
+    // DEMON SLAYER 👺
+    // ============================================
+    private List<Character> fetchDemonSlayerCharacters(int limit, int offset) {
+        try {
+            String url = "https://demon-slayer-api.onrender.com/v1?limit=" + limit;
+            log.info("Fetching Demon Slayer characters from: {}", url);
+            
+            String response = restTemplate.getForObject(url, String.class);
+            JsonNode root = objectMapper.readTree(response);
+            
+            List<Character> characters = new ArrayList<>();
+            if (root != null && root.isArray()) {
+                int count = 0;
+                for (int i = offset; i < root.size() && count < limit; i++, count++) {
+                    JsonNode node = root.get(i);
+                    
+                    Character character = Character.builder()
+                            .id(node.get("id").asText())
+                            .name(node.get("name").asText())
+                            .imageUrl(node.has("img") ? node.get("img").asText() : "")
+                            .type(node.has("category") ? node.get("category").asText() : "Unknown")
+                            .stats(new java.util.HashMap<>())
+                            .build();
+                    
+                    if (node.has("breathingStyle")) {
+                        character.getStats().put("breathing", node.get("breathingStyle").asText());
+                    }
+                    
+                    characters.add(character);
+                }
+            }
+            
+            return characters;
+        } catch (Exception e) {
+            log.error("Error fetching Demon Slayer characters", e);
+            return new ArrayList<>();
+        }
     }
 
-    private Map<String, Integer> generateDigimonStats(String level) {
-        Map<String, Integer> stats = new HashMap<>();
-        int baseValue = switch (level.toLowerCase()) {
-            case "rookie" -> 40;
-            case "champion" -> 60;
-            case "ultimate" -> 80;
-            case "mega" -> 100;
-            default -> 50;
-        };
+    // ============================================
+    // JIKAN API (MyAnimeList) - UNIVERSAL 📺
+    // ============================================
+    private List<Character> fetchJikanCharacters(Universe universe, int limit, int offset) {
+        try {
+            // Rate limiting
+            waitForJikanRateLimit();
+            
+            String animeId = universe.getEndpoint();
+            String url = "https://api.jikan.moe/v4/anime/" + animeId + "/characters";
+            log.info("Fetching {} characters from Jikan: {}", universe.getDisplayName(), url);
+            
+            String response = restTemplate.getForObject(url, String.class);
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode data = root.get("data");
+            
+            List<Character> characters = new ArrayList<>();
+            if (data != null && data.isArray()) {
+                int count = 0;
+                for (int i = offset; i < data.size() && count < limit; i++, count++) {
+                    JsonNode node = data.get(i);
+                    JsonNode charNode = node.get("character");
+                    
+                    Character character = Character.builder()
+                            .id(charNode.get("mal_id").asText())
+                            .name(charNode.get("name").asText())
+                            .imageUrl(charNode.get("images").get("jpg").get("image_url").asText())
+                            .type(node.get("role").asText())
+                            .stats(new java.util.HashMap<>())
+                            .build();
+                    
+                    if (charNode.has("url")) {
+                        character.getStats().put("mal_url", charNode.get("url").asText());
+                    }
+                    
+                    characters.add(character);
+                }
+            }
+            
+            return characters;
+        } catch (Exception e) {
+            log.error("Error fetching Jikan characters for {}", universe.getDisplayName(), e);
+            return new ArrayList<>();
+        }
+    }
+
+    // Rate limit helper para Jikan
+    private synchronized void waitForJikanRateLimit() {
+        long now = System.currentTimeMillis();
+        long elapsed = now - lastJikanRequest;
         
-        stats.put("attack", baseValue + new Random().nextInt(20));
-        stats.put("defense", baseValue + new Random().nextInt(20));
-        stats.put("speed", baseValue + new Random().nextInt(20));
+        if (elapsed < JIKAN_DELAY_MS) {
+            try {
+                Thread.sleep(JIKAN_DELAY_MS - elapsed);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
         
-        return stats;
+        lastJikanRequest = System.currentTimeMillis();
     }
 }

@@ -1,120 +1,98 @@
 package com.multiverse.controller;
 
-import com.multiverse.dto.ComparisonResult;
 import com.multiverse.model.Character;
+import com.multiverse.model.ComparisonResult;
 import com.multiverse.model.Universe;
 import com.multiverse.service.MultiverseService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.context.annotation.Bean;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
-@Slf4j
 @RestController
 @RequestMapping("/api/multiverse")
 @RequiredArgsConstructor
-@Tag(name = "Multiverse Explorer", description = "Explore dados de múltiplos universos")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
 public class MultiverseController {
 
     private final MultiverseService multiverseService;
 
-
-    @GetMapping("/universes")
-    @Operation(summary = "Listar universos disponíveis", description = "Retorna todos os universos que podem ser explorados")
-    public ResponseEntity<List<UniverseInfo>> getUniverses() {
-        List<UniverseInfo> universes = Arrays.stream(Universe.values())
-                .map(u -> new UniverseInfo(u.name(), u.getDisplayName(), u.getApiBaseUrl()))
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(universes);
-    }
-
-
+    /**
+     * GET /api/multiverse/{universe}/characters?limit=50&offset=0
+     * Retorna lista de personagens com paginação (SCROLL INFINITO)
+     */
     @GetMapping("/{universe}/characters")
-    @Operation(summary = "Listar personagens", description = "Retorna personagens de um universo específico")
     public ResponseEntity<List<Character>> getCharacters(
-            @Parameter(description = "Universo (POKEMON, DIGIMON)", required = true)
-            @PathVariable String universe,
-            
-            @Parameter(description = "Limite de resultados", example = "20")
-            @RequestParam(defaultValue = "20") int limit
+            @PathVariable Universe universe,
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset  // ← OFFSET PARA SCROLL INFINITO
     ) {
-        try {
-            Universe uni = Universe.valueOf(universe.toUpperCase());
-            List<Character> characters = multiverseService.getCharacters(uni, limit);
-            return ResponseEntity.ok(characters);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
+        List<Character> characters = multiverseService.getCharacters(universe, limit, offset);
+        return ResponseEntity.ok(characters);
     }
 
+    /**
+     * GET /api/multiverse/{universe}/characters/{name}
+     * Busca personagem específico por nome
+     */
     @GetMapping("/{universe}/characters/{name}")
-    @Operation(summary = "Buscar personagem por nome", description = "Retorna detalhes de um personagem específico")
-    public ResponseEntity<Character> getCharacter(
-            @Parameter(description = "Universo", required = true)
-            @PathVariable String universe,
-            
-            @Parameter(description = "Nome do personagem", required = true)
+    public ResponseEntity<Character> getCharacterByName(
+            @PathVariable Universe universe,
             @PathVariable String name
     ) {
-        try {
-            Universe uni = Universe.valueOf(universe.toUpperCase());
-            Character character = multiverseService.getCharacterByName(uni, name);
-            
-            if (character == null) {
-                return ResponseEntity.notFound().build();
-            }
-            
-            return ResponseEntity.ok(character);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
+        Character character = multiverseService.getCharacterByName(universe, name);
+        return ResponseEntity.ok(character);
     }
 
+    /**
+     * POST /api/multiverse/compare
+     * Compara múltiplos personagens (2-8)
+     */
     @PostMapping("/compare")
-    @Operation(summary = "Comparar personagens", description = "Compara stats de dois personagens (mesmo universo ou universos diferentes)")
     public ResponseEntity<ComparisonResult> compareCharacters(
-            @Parameter(description = "Universo do personagem 1", required = true)
-            @RequestParam String universe1,
-            
-            @Parameter(description = "Nome do personagem 1", required = true)
-            @RequestParam String name1,
-            
-            @Parameter(description = "Universo do personagem 2", required = true)
-            @RequestParam String universe2,
-            
-            @Parameter(description = "Nome do personagem 2", required = true)
-            @RequestParam String name2
+            @RequestBody ComparisonRequest request
     ) {
-        ComparisonResult result = multiverseService.compareCharacters(universe1, name1, universe2, name2);
-        
-        if (result == null) {
-            return ResponseEntity.notFound().build();
+        if (request.getCharacters() == null || request.getCharacters().size() < 2) {
+            return ResponseEntity.badRequest().build();
         }
         
+        if (request.getCharacters().size() > 8) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        ComparisonResult result = multiverseService.compareCharacters(request.getCharacters());
         return ResponseEntity.ok(result);
     }
 
-    @GetMapping("/health")
-    @Operation(summary = "Health check", description = "Verifica se a API está funcionando")
-    public ResponseEntity<HealthResponse> healthCheck() {
-        return ResponseEntity.ok(new HealthResponse(
-                "Multiverse Data Explorer API is running",
-                "1.0.0",
-                Arrays.stream(Universe.values()).map(Universe::getDisplayName).collect(Collectors.toList())
-        ));
+    /**
+     * GET /api/multiverse/universes
+     * Lista todos os universos disponíveis
+     */
+    @GetMapping("/universes")
+    public ResponseEntity<Universe[]> getUniverses() {
+        return ResponseEntity.ok(Universe.values());
     }
 
-    // DTOs internos
-    public record UniverseInfo(String id, String name, String apiUrl) {}
-    public record HealthResponse(String status, String version, List<String> availableUniverses) {}
+    /**
+     * GET /api/multiverse/health
+     * Health check
+     */
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("Multiverse Explorer API is running - 22 Universes Available!");
+    }
+
+    // DTO para request de comparação (até 8 personagens)
+    public static class ComparisonRequest {
+        private List<Character> characters;
+
+        public List<Character> getCharacters() {
+            return characters;
+        }
+
+        public void setCharacters(List<Character> characters) {
+            this.characters = characters;
+        }
+    }
 }
