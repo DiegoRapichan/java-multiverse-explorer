@@ -2,22 +2,17 @@ package com.multiverse.model;
 
 /**
  * Enum representando todos os universos de anime disponíveis
+ * Dragon Ball, Naruto e Demon Slayer migrados para Jikan API
  */
 public enum Universe {
-    // Originais
+    // APIs próprias
     POKEMON("Pokemon", "https://pokeapi.co/api/v2", "pokemon"),
     DIGIMON("Digimon", "https://digimon-api.vercel.app/api", "digimon"),
-    
-    // Dragon Ball Franchise
-    DRAGON_BALL("Dragon Ball", "https://web.dragonball-api.com/api", "characters"),
-    
-    // Naruto Franchise
-    NARUTO("Naruto", "https://api-dattebayo.vercel.app/anime", "characters"),
-    
-    // Demon Slayer
-    DEMON_SLAYER("Demon Slayer", "https://demon-slayer-api.onrender.com/v1", null),
-    
-    // Via Jikan API (MyAnimeList) - ID dos animes
+
+    // Via Jikan API (MyAnimeList) - todos os demais usam o anime ID
+    DRAGON_BALL("Dragon Ball Z", "https://api.jikan.moe/v4", "813"),
+    NARUTO("Naruto", "https://api.jikan.moe/v4", "20"),
+    DEMON_SLAYER("Demon Slayer", "https://api.jikan.moe/v4", "38000"),
     MY_HERO_ACADEMIA("My Hero Academia", "https://api.jikan.moe/v4", "31964"),
     ONE_PIECE("One Piece", "https://api.jikan.moe/v4", "21"),
     ATTACK_ON_TITAN("Attack on Titan", "https://api.jikan.moe/v4", "16498"),
@@ -38,7 +33,7 @@ public enum Universe {
 
     private final String displayName;
     private final String apiBaseUrl;
-    private final String endpoint; // Para Jikan, é o anime ID
+    private final String endpoint;
 
     Universe(String displayName, String apiBaseUrl, String endpoint) {
         this.displayName = displayName;
@@ -46,31 +41,16 @@ public enum Universe {
         this.endpoint = endpoint;
     }
 
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public String getApiBaseUrl() {
-        return apiBaseUrl;
-    }
-
-    public String getEndpoint() {
-        return endpoint;
-    }
+    public String getDisplayName() { return displayName; }
+    public String getApiBaseUrl()  { return apiBaseUrl; }
+    public String getEndpoint()    { return endpoint; }
 
     public boolean isJikanApi() {
         return apiBaseUrl.contains("jikan.moe");
     }
 
-    public boolean isDragonBallApi() {
-        return this == DRAGON_BALL;
-    }
-
-    public boolean isNarutoApi() {
-        return this == NARUTO;
-    }
-
-    public boolean isDemonSlayerApi() {
-        return this == DEMON_SLAYER;
-    }
+    // Mantidos por compatibilidade — agora sempre false pois migraram para Jikan
+    public boolean isDragonBallApi()  { return false; }
+    public boolean isNarutoApi()      { return false; }
+    public boolean isDemonSlayerApi() { return false; }
 }

@@ -1,6 +1,21 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ResponsiveContainer,
+} from "recharts";
+import {
+  FaSearch,
+  FaBolt,
+  FaExchangeAlt,
+  FaTrophy,
+  FaGlobe,
+} from "react-icons/fa";
+import {
   Character,
   Universe,
   UNIVERSE_CONFIG,
@@ -15,12 +30,12 @@ export default function MultiverseExplorer() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCharacters, setSelectedCharacters] = useState<Character[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCharacters, setSelectedCharacters] = useState<Character[]>([]);
+  const [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
-  // SCROLL INFINITO
+  // Scroll infinito
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -28,28 +43,19 @@ export default function MultiverseExplorer() {
 
   const loadCharacters = useCallback(
     async (universe: Universe, pageNum: number, append = false) => {
-      if (pageNum === 0) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
+      if (pageNum === 0) setLoading(true);
+      else setLoadingMore(true);
       setError(null);
-
       try {
         const limit = 50;
         const offset = pageNum * limit;
         const data = await api.getCharacters(universe, limit, offset);
-
-        if (append) {
-          setCharacters((prev) => [...prev, ...data]);
-        } else {
-          setCharacters(data);
-        }
-
+        if (append) setCharacters((prev) => [...prev, ...data]);
+        else setCharacters(data);
         setHasMore(data.length === limit);
       } catch (err) {
-        setError("Failed to load characters");
-        console.error("Error loading characters:", err);
+        setError("Erro ao carregar personagens");
+        console.error(err);
       } finally {
         setLoading(false);
         setLoadingMore(false);
@@ -70,217 +76,385 @@ export default function MultiverseExplorer() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
-          const nextPage = page + 1;
-          setPage(nextPage);
-          loadCharacters(selectedUniverse, nextPage, true);
+          const next = page + 1;
+          setPage(next);
+          loadCharacters(selectedUniverse, next, true);
         }
       },
       { threshold: 0.1 },
     );
-
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
-    }
-
+    if (observerTarget.current) observer.observe(observerTarget.current);
     return () => {
-      if (observerTarget.current) {
-        observer.unobserve(observerTarget.current);
-      }
+      if (observerTarget.current) observer.unobserve(observerTarget.current);
     };
   }, [hasMore, loading, loadingMore, page, selectedUniverse, loadCharacters]);
 
-  const handleSelectCharacter = (character: Character) => {
-    if (selectedCharacters.some((c) => c.id === character.id)) {
-      setSelectedCharacters(
-        selectedCharacters.filter((c) => c.id !== character.id),
-      );
-    } else {
-      if (selectedCharacters.length < MAX_CHARACTERS) {
-        setSelectedCharacters([...selectedCharacters, character]);
-      }
+  const handleSelectCharacter = (char: Character) => {
+    if (selectedCharacters.some((c) => c.id === char.id)) {
+      setSelectedCharacters(selectedCharacters.filter((c) => c.id !== char.id));
+    } else if (selectedCharacters.length < MAX_CHARACTERS) {
+      setSelectedCharacters([...selectedCharacters, char]);
     }
   };
 
-  // ✅ CORRIGIDO: manda a lista inteira de personagens
   const handleCompare = async () => {
     if (selectedCharacters.length < 2) return;
-
     try {
       const result = await api.compareCharacters(selectedCharacters);
       setComparison(result);
       setShowModal(true);
     } catch (err) {
-      console.error("Error comparing characters:", err);
+      console.error("Error comparing:", err);
     }
   };
 
-  const filteredCharacters = characters.filter((character) =>
-    character.name.toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredCharacters = characters.filter((c) =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.05 },
-    },
+  const getTypeColor = (type: string) => {
+    const colors: Record<string, string> = {
+      fire: "#ef4444",
+      water: "#3b82f6",
+      grass: "#22c55e",
+      electric: "#eab308",
+      psychic: "#a855f7",
+      ice: "#06b6d4",
+      dragon: "#6366f1",
+      dark: "#374151",
+      fighting: "#dc2626",
+      normal: "#6b7280",
+      poison: "#a21caf",
+      ground: "#ca8a04",
+      flying: "#7dd3fc",
+      bug: "#65a30d",
+      rock: "#78716c",
+      ghost: "#7c3aed",
+      steel: "#94a3b8",
+      fairy: "#f9a8d4",
+      rookie: "#3b82f6",
+      champion: "#6366f1",
+      ultimate: "#a855f7",
+      mega: "#ef4444",
+      ultra: "#f97316",
+      "in training": "#06b6d4",
+      fresh: "#22d3ee",
+    };
+    return colors[type?.toLowerCase()] || "#3b82f6";
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 },
+  const getRadarData = (stats: Record<string, string | number>) => {
+    return Object.entries(stats)
+      .filter(([, v]) => !isNaN(Number(v)))
+      .slice(0, 6)
+      .map(([key, value]) => ({
+        stat: key.substring(0, 6).toUpperCase(),
+        value: Number(value),
+        fullMark: 150,
+      }));
   };
+
+  const universeConfig = UNIVERSE_CONFIG as Record<
+    string,
+    { displayName: string; icon: string }
+  >;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* HEADER */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
-        >
-          <h1 className="text-6xl font-bold mb-4 text-white">
-            🌌 Multiverse Explorer
-          </h1>
-          <p className="text-xl text-cyan-400">
-            Compare personagens de 22 universos diferentes!
-          </p>
-        </motion.div>
+    <div
+      className="min-h-screen text-white"
+      style={{
+        background:
+          "radial-gradient(ellipse at 20% 50%, #1e3a8a 0%, #0f172a 40%, #0f172a 60%, #1e3a5f 100%)",
+      }}
+    >
+      {/* HEADER */}
+      <div className="relative overflow-hidden border-b border-blue-900/40">
+        {/* Grid pattern de fundo */}
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(59,130,246,0.3) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(59,130,246,0.3) 1px, transparent 1px)
+            `,
+            backgroundSize: "40px 40px",
+          }}
+        />
 
-        {/* SELETOR DE UNIVERSO */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
-          {Object.entries(UNIVERSE_CONFIG).map(([key, config]) => (
-            <button
-              key={key}
-              onClick={() => setSelectedUniverse(key as Universe)}
-              className={`p-4 rounded-xl font-bold transition-all transform hover:scale-105 ${
-                selectedUniverse === key
-                  ? `bg-gradient-to-r ${config.gradient} text-white shadow-2xl scale-105`
-                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-              }`}
+        <div className="relative container mx-auto px-4 py-10 text-center">
+          {/* Logo + Título */}
+          <motion.div
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center justify-center gap-4 mb-2"
+          >
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
+              style={{
+                background: "linear-gradient(135deg, #38bdf8, #3b82f6)",
+              }}
             >
-              <div className="text-3xl mb-2">{config.icon}</div>
-              <div className="text-sm">{config.displayName}</div>
-            </button>
-          ))}
-        </div>
-
-        {/* BUSCA */}
-        <div className="mb-8">
-          <input
-            type="text"
-            placeholder="🔍 Buscar personagem..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-6 py-4 bg-gray-800 text-white rounded-xl border-2 border-gray-700 focus:border-cyan-400 focus:outline-none text-lg"
-          />
-        </div>
-
-        {/* PERSONAGENS SELECIONADOS */}
-        {selectedCharacters.length > 0 && (
-          <div className="mb-8 p-6 bg-gray-800 rounded-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-2xl font-bold text-white">
-                Selecionados: {selectedCharacters.length}/{MAX_CHARACTERS}
-              </h3>
-              <button
-                onClick={handleCompare}
-                disabled={selectedCharacters.length < 2}
-                className="px-6 py-3 bg-gradient-to-r from-green-500 to-cyan-500 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transition-all"
-              >
-                ⚔️ Comparar {selectedCharacters.length} Personagens
-              </button>
+              <FaGlobe />
             </div>
-            <div className="flex gap-4 overflow-x-auto pb-2">
-              {selectedCharacters.map((char) => (
-                <div key={char.id} className="flex-shrink-0 w-24 text-center">
-                  <img
-                    src={char.imageUrl}
-                    alt={char.name}
-                    className="w-20 h-20 rounded-full object-cover mx-auto mb-2 ring-4 ring-cyan-400"
-                  />
-                  <p className="text-white text-sm truncate">{char.name}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+            <h1
+              className="text-6xl font-black tracking-tight"
+              style={{
+                color: "#38bdf8",
+                textShadow: "0 0 40px rgba(56,189,248,0.4)",
+              }}
+            >
+              MULTIVERSE
+            </h1>
+          </motion.div>
 
-        {/* ALERTA MÁXIMO */}
-        {selectedCharacters.length >= MAX_CHARACTERS && (
-          <div className="mb-4 p-4 bg-yellow-500 bg-opacity-20 border-2 border-yellow-500 rounded-xl text-yellow-300 text-center">
-            ⚠️ Máximo de {MAX_CHARACTERS} personagens selecionados!
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            <p className="text-blue-300 text-lg font-semibold tracking-widest mb-1">
+              DATA EXPLORER
+            </p>
+            <p className="text-slate-400 text-sm mb-8">
+              Explore, compare and discover characters across multiple universes
+            </p>
+          </motion.div>
+
+          {/* Seletor de Universo */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="flex flex-wrap justify-center gap-2 mb-6 max-w-4xl mx-auto"
+          >
+            {Object.entries(universeConfig).map(([key, config]) => {
+              const isActive = selectedUniverse === key;
+              return (
+                <motion.button
+                  key={key}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setSelectedUniverse(key as Universe)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all"
+                  style={{
+                    background: isActive
+                      ? "linear-gradient(135deg, #38bdf8, #3b82f6)"
+                      : "rgba(255,255,255,0.05)",
+                    border: isActive
+                      ? "1px solid #38bdf8"
+                      : "1px solid rgba(255,255,255,0.1)",
+                    color: isActive ? "#fff" : "#94a3b8",
+                    boxShadow: isActive
+                      ? "0 0 20px rgba(56,189,248,0.3)"
+                      : "none",
+                  }}
+                >
+                  <span>{config.icon}</span>
+                  <span>{config.displayName}</span>
+                </motion.button>
+              );
+            })}
+          </motion.div>
+
+          {/* Busca */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="max-w-xl mx-auto"
+          >
+            <div className="relative">
+              <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" />
+              <input
+                type="text"
+                placeholder="Search character..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 rounded-2xl text-white placeholder-slate-500 focus:outline-none transition-all"
+                style={{
+                  background: "rgba(15,23,42,0.8)",
+                  border: "1px solid rgba(56,189,248,0.3)",
+                }}
+              />
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* CONTEÚDO PRINCIPAL */}
+      <div className="container mx-auto px-4 py-6">
+        {/* Contador de personagens */}
+        {!loading && characters.length > 0 && (
+          <div className="text-center mb-4">
+            <span className="inline-flex items-center gap-2 text-sm text-slate-400">
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse inline-block"></span>
+              {filteredCharacters.length} characters
+            </span>
           </div>
         )}
 
         {/* LOADING INICIAL */}
         {loading && (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-cyan-400"></div>
+          <div className="flex justify-center items-center h-64">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              className="w-14 h-14 rounded-full border-4 border-t-transparent"
+              style={{ borderColor: "#3b82f6", borderTopColor: "transparent" }}
+            />
           </div>
         )}
 
         {/* ERRO */}
-        {error && (
-          <div className="text-center py-8 text-red-400 text-xl">{error}</div>
-        )}
+        {error && <div className="text-center py-10 text-red-400">{error}</div>}
 
         {/* GRID DE PERSONAGENS */}
         {!loading && !error && (
-          <motion.div
-            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            {filteredCharacters.map((character) => (
-              <motion.div
-                key={character.id}
-                variants={itemVariants}
-                onClick={() => handleSelectCharacter(character)}
-                className={`bg-gray-800 rounded-xl p-4 cursor-pointer transition-all transform hover:scale-105 hover:shadow-2xl ${
-                  selectedCharacters.some((c) => c.id === character.id)
-                    ? "ring-4 ring-cyan-400 scale-105"
-                    : ""
-                }`}
-              >
-                <img
-                  src={character.imageUrl}
-                  alt={character.name}
-                  className="w-full h-48 object-cover rounded-lg mb-3"
-                />
-                <h3 className="text-lg font-bold text-white mb-1 truncate">
-                  {character.name}
-                </h3>
-                <p className="text-cyan-400 text-sm">{character.type}</p>
-              </motion.div>
-            ))}
-          </motion.div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {filteredCharacters.map((char, index) => {
+              const isSelected = selectedCharacters.some(
+                (c) => c.id === char.id,
+              );
+              const typeColor = getTypeColor(char.type);
+
+              return (
+                <motion.div
+                  key={char.id}
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: Math.min(index * 0.03, 0.5) }}
+                  whileHover={{ scale: 1.04, y: -4 }}
+                  onClick={() => handleSelectCharacter(char)}
+                  className="cursor-pointer rounded-2xl overflow-hidden transition-all"
+                  style={{
+                    background: "rgba(15,23,42,0.9)",
+                    border: isSelected
+                      ? "2px solid #facc15"
+                      : "1px solid rgba(56,189,248,0.2)",
+                    boxShadow: isSelected
+                      ? "0 0 20px rgba(250,204,21,0.3)"
+                      : "0 2px 12px rgba(0,0,0,0.4)",
+                  }}
+                >
+                  {/* Imagem */}
+                  <div
+                    className="w-full flex items-center justify-center overflow-hidden"
+                    style={{
+                      background: "rgba(241,245,249,0.97)",
+                      height: "140px",
+                    }}
+                  >
+                    <img
+                      src={char.imageUrl || "https://via.placeholder.com/120"}
+                      alt={char.name}
+                      className="h-full w-full object-contain p-2 transition-transform group-hover:scale-110"
+                      onError={(e) => {
+                        e.currentTarget.src = "https://via.placeholder.com/120";
+                      }}
+                    />
+                  </div>
+
+                  {/* Info */}
+                  <div className="p-3">
+                    <h3 className="font-bold text-sm text-white text-center mb-2 truncate capitalize">
+                      {char.name}
+                    </h3>
+
+                    {/* Badge de tipo */}
+                    <div className="flex justify-center mb-2">
+                      <span
+                        className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider"
+                        style={{
+                          background: `${typeColor}22`,
+                          border: `1px solid ${typeColor}66`,
+                          color: typeColor,
+                        }}
+                      >
+                        {char.type}
+                      </span>
+                    </div>
+
+                    {/* Mini stats */}
+                    {Object.keys(char.stats || {}).length > 0 && (
+                      <div className="grid grid-cols-3 gap-1">
+                        {Object.entries(char.stats)
+                          .slice(0, 3)
+                          .map(([key, value]) => (
+                            <div
+                              key={key}
+                              className="text-center rounded-lg py-1"
+                              style={{ background: "rgba(30,58,138,0.4)" }}
+                            >
+                              <div
+                                className="text-blue-400 uppercase text-xs font-bold"
+                                style={{ fontSize: "9px" }}
+                              >
+                                {key.substring(0, 3)}
+                              </div>
+                              <div className="text-white font-bold text-xs">
+                                {String(value)
+                                  .replace(/[^0-9]/g, "")
+                                  .substring(0, 4) || value}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
         )}
 
         {/* LOADING MORE */}
         {loadingMore && (
-          <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-400"></div>
-            <p className="ml-4 text-white text-lg">
-              Carregando mais personagens...
-            </p>
+          <div className="flex justify-center items-center py-8 gap-3">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              className="w-8 h-8 rounded-full border-2 border-t-transparent"
+              style={{ borderColor: "#3b82f6", borderTopColor: "transparent" }}
+            />
+            <span className="text-slate-400 text-sm">Loading more...</span>
           </div>
         )}
 
-        {/* OBSERVER TRIGGER */}
-        <div ref={observerTarget} className="h-10"></div>
+        {/* Observer trigger */}
+        <div ref={observerTarget} className="h-10" />
 
-        {/* MENSAGEM FIM */}
+        {/* Fim da lista */}
         {!hasMore && characters.length > 0 && (
-          <div className="text-center py-8">
-            <p className="text-white text-lg">
-              ✨ Todos os personagens carregados!
-            </p>
+          <div className="text-center py-6 text-slate-500 text-sm">
+            ✨ All characters loaded
           </div>
         )}
       </div>
+
+      {/* BOTÃO FLUTUANTE DE COMPARAÇÃO */}
+      <AnimatePresence>
+        {selectedCharacters.length >= 2 && (
+          <motion.div
+            initial={{ opacity: 0, y: 60 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 60 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+          >
+            <button
+              onClick={handleCompare}
+              className="flex items-center gap-3 px-8 py-4 rounded-full font-bold text-lg shadow-2xl transition-all hover:scale-105"
+              style={{
+                background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                boxShadow: "0 0 30px rgba(34,197,94,0.5)",
+              }}
+            >
+              <FaExchangeAlt className="animate-pulse" />
+              Compare {selectedCharacters.length} Characters
+              <FaBolt />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* MODAL DE COMPARAÇÃO */}
       <AnimatePresence>
@@ -289,57 +463,86 @@ export default function MultiverseExplorer() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{
+              background: "rgba(0,0,0,0.85)",
+              backdropFilter: "blur(8px)",
+            }}
             onClick={() => setShowModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
+              initial={{ scale: 0.85, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className="bg-gray-900 rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              exit={{ scale: 0.85, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
+              className="rounded-3xl p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+              style={{
+                background: "linear-gradient(135deg, #0f172a, #1e3a8a22)",
+                border: "2px solid rgba(56,189,248,0.3)",
+                boxShadow: "0 0 60px rgba(56,189,248,0.15)",
+              }}
             >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-bold text-white">⚔️ Resultado</h2>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="text-gray-400 hover:text-white text-2xl"
-                >
-                  ✕
-                </button>
-              </div>
+              <h2
+                className="text-4xl font-black text-center mb-8"
+                style={{
+                  color: "#38bdf8",
+                  textShadow: "0 0 30px rgba(56,189,248,0.5)",
+                }}
+              >
+                ⚔️ BATTLE COMPARISON
+              </h2>
 
               {/* VENCEDOR */}
-              <div className="text-center mb-8 p-6 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl">
-                <p className="text-white text-lg mb-2">🏆 Vencedor</p>
-                <h3 className="text-4xl font-bold text-white">
+              <div
+                className="rounded-2xl p-5 text-center mb-6"
+                style={{
+                  background: "linear-gradient(135deg, #ca8a04, #ea580c)",
+                }}
+              >
+                <FaTrophy className="text-4xl mx-auto mb-2" />
+                <div className="text-sm font-bold uppercase tracking-widest mb-1 opacity-80">
+                  Winner
+                </div>
+                <div className="text-4xl font-black capitalize">
                   {comparison.winner.name}
-                </h3>
+                </div>
               </div>
 
               {/* ANÁLISE */}
               {comparison.analysis && (
-                <p className="text-gray-300 text-center mb-6 italic">
+                <p className="text-slate-400 text-center text-sm mb-6 italic px-4">
                   {comparison.analysis}
                 </p>
               )}
 
               {/* RANKING */}
-              <div className="space-y-3">
+              <div className="space-y-2 mb-6">
+                <h3 className="text-blue-300 font-bold text-lg mb-3 flex items-center gap-2">
+                  <FaTrophy /> Power Ranking
+                </h3>
                 {comparison.ranking.map((char, index) => (
-                  <div
+                  <motion.div
                     key={char.id}
-                    className={`flex items-center gap-4 p-4 rounded-xl ${
-                      index === 0
-                        ? "bg-gradient-to-r from-yellow-500 to-orange-500"
-                        : index === 1
-                          ? "bg-gradient-to-r from-gray-400 to-gray-500"
-                          : index === 2
-                            ? "bg-gradient-to-r from-orange-700 to-orange-800"
-                            : "bg-gray-700"
-                    }`}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.07 }}
+                    className="flex items-center gap-4 p-3 rounded-xl"
+                    style={{
+                      background:
+                        index === 0
+                          ? "linear-gradient(135deg, rgba(202,138,4,0.3), rgba(234,88,12,0.3))"
+                          : index === 1
+                            ? "rgba(148,163,184,0.1)"
+                            : index === 2
+                              ? "rgba(180,83,9,0.15)"
+                              : "rgba(255,255,255,0.04)",
+                      border:
+                        index === 0
+                          ? "1px solid rgba(202,138,4,0.4)"
+                          : "1px solid rgba(255,255,255,0.06)",
+                    }}
                   >
-                    <div className="text-3xl font-bold w-10 text-center">
+                    <div className="text-2xl w-8 text-center">
                       {index === 0
                         ? "🥇"
                         : index === 1
@@ -351,22 +554,92 @@ export default function MultiverseExplorer() {
                     <img
                       src={char.imageUrl}
                       alt={char.name}
-                      className="w-14 h-14 rounded-full object-cover"
+                      className="w-12 h-12 rounded-xl object-contain"
+                      style={{
+                        background: "rgba(241,245,249,0.9)",
+                        padding: "2px",
+                      }}
                     />
                     <div className="flex-1">
-                      <h4 className="text-lg font-bold text-white">
+                      <div className="font-bold text-white capitalize">
                         {char.name}
-                      </h4>
-                      <p className="text-sm opacity-80 text-white">
-                        {char.type}
-                      </p>
+                      </div>
+                      <div className="text-xs text-slate-400">{char.type}</div>
                     </div>
-                    <div className="text-xl font-bold text-white">
+                    <div
+                      className="font-black text-lg px-3 py-1 rounded-lg"
+                      style={{
+                        background: "rgba(56,189,248,0.15)",
+                        color: "#38bdf8",
+                        border: "1px solid rgba(56,189,248,0.3)",
+                      }}
+                    >
                       {char.totalPower} pts
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
+
+              {/* RADAR CHART — até 2 personagens */}
+              {comparison.ranking.length === 2 && (
+                <div className="grid md:grid-cols-2 gap-4 mb-6">
+                  {[comparison.ranking[0], comparison.ranking[1]].map(
+                    (char, i) => {
+                      const fullChar = selectedCharacters.find(
+                        (c) => c.id === char.id,
+                      );
+                      const radarData = fullChar
+                        ? getRadarData(fullChar.stats)
+                        : [];
+                      if (radarData.length === 0) return null;
+                      return (
+                        <div
+                          key={char.id}
+                          className="rounded-2xl p-4"
+                          style={{
+                            background: "rgba(255,255,255,0.04)",
+                            border: "1px solid rgba(56,189,248,0.15)",
+                          }}
+                        >
+                          <p className="text-center text-sm font-bold text-blue-300 mb-2 capitalize">
+                            {char.name}
+                          </p>
+                          <ResponsiveContainer width="100%" height={200}>
+                            <RadarChart data={radarData}>
+                              <PolarGrid stroke="rgba(56,189,248,0.2)" />
+                              <PolarAngleAxis
+                                dataKey="stat"
+                                stroke="#94a3b8"
+                                tick={{ fontSize: 10 }}
+                              />
+                              <PolarRadiusAxis stroke="rgba(56,189,248,0.1)" />
+                              <Radar
+                                name={char.name}
+                                dataKey="value"
+                                stroke={i === 0 ? "#38bdf8" : "#f472b6"}
+                                fill={i === 0 ? "#38bdf8" : "#f472b6"}
+                                fillOpacity={0.25}
+                              />
+                            </RadarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowModal(false)}
+                className="w-full py-3 rounded-xl font-bold transition-all hover:opacity-80"
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "#94a3b8",
+                }}
+              >
+                Fechar
+              </button>
             </motion.div>
           </motion.div>
         )}

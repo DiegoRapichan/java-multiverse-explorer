@@ -41,6 +41,10 @@ public class MultiverseService {
                 .build();
     }
 
+    // =========================================================
+    // PÚBLICO
+    // =========================================================
+
     public List<Character> getCharacters(Universe universe, int limit, int offset) {
         String cacheKey = universe.name() + "_" + limit + "_" + offset;
 
@@ -56,13 +60,8 @@ public class MultiverseService {
             characters = fetchPokemonCharacters(limit, offset);
         } else if (universe == Universe.DIGIMON) {
             characters = fetchDigimonCharacters(limit, offset);
-        } else if (universe.isDragonBallApi()) {
-            characters = fetchDragonBallCharacters(limit, offset);
-        } else if (universe.isNarutoApi()) {
-            characters = fetchNarutoCharacters(limit, offset);
-        } else if (universe.isDemonSlayerApi()) {
-            characters = fetchDemonSlayerCharacters(limit, offset);
         } else if (universe.isJikanApi()) {
+            // Dragon Ball, Naruto, Demon Slayer e todos os outros via Jikan
             characters = fetchJikanCharacters(universe, limit, offset);
         } else {
             characters = new ArrayList<>();
@@ -108,10 +107,12 @@ public class MultiverseService {
                 .build();
     }
 
+    // =========================================================
+    // PRIVADO — helpers
+    // =========================================================
+
     private int calculatePower(Character character) {
-        if (character.getStats() == null || character.getStats().isEmpty()) {
-            return 0;
-        }
+        if (character.getStats() == null || character.getStats().isEmpty()) return 0;
         return character.getStats().values().stream()
                 .mapToInt(val -> {
                     try {
@@ -127,14 +128,11 @@ public class MultiverseService {
     private String buildAnalysis(List<RankedCharacter> ranking) {
         RankedCharacter winner = ranking.get(0);
         StringBuilder sb = new StringBuilder();
-        sb.append(winner.getName())
-          .append(" vence com ")
-          .append(winner.getTotalPower())
-          .append(" pts. Ranking: ");
+        sb.append(winner.getName()).append(" vence com ")
+          .append(winner.getTotalPower()).append(" pts. Ranking: ");
         for (RankedCharacter rc : ranking) {
             sb.append(rc.getPosition()).append("º ")
-              .append(rc.getName())
-              .append(" (").append(rc.getTotalPower()).append(" pts)");
+              .append(rc.getName()).append(" (").append(rc.getTotalPower()).append(" pts)");
             if (rc.getPosition() < ranking.size()) sb.append(", ");
         }
         return sb.toString();
@@ -237,205 +235,8 @@ public class MultiverseService {
     }
 
     // =========================================================
-    // DRAGON BALL — dragonballapp.vercel.app
-    // Resposta: [ { id, name, image, race, description }, ... ]
-    // =========================================================
-    private List<Character> fetchDragonBallCharacters(int limit, int offset) {
-        try {
-            // API paginada: page começa em 1, pageSize fixo em 10
-            int page = (offset / 10) + 1;
-            String url = "https://dragonball-api.com/api/characters?page=" + page + "&limit=" + Math.min(limit, 10);
-            log.info("Fetching Dragon Ball from: {}", url);
-
-            JsonNode root = objectMapper.readTree(restTemplate.getForObject(url, String.class));
-
-            // Resposta: { "items": [...], "meta": { "totalItems": ..., "currentPage": ... } }
-            JsonNode items = root.has("items") ? root.get("items") : root;
-
-            List<Character> characters = new ArrayList<>();
-            if (items != null && items.isArray()) {
-                for (JsonNode node : items) {
-                    Map<String, String> stats = new HashMap<>();
-
-                    // Stats de ki se disponíveis
-                    if (node.has("ki") && !node.get("ki").isNull())
-                        stats.put("ki", node.get("ki").asText());
-                    if (node.has("maxKi") && !node.get("maxKi").isNull())
-                        stats.put("maxKi", node.get("maxKi").asText());
-
-                    // Affiliation como stat simbólico
-                    if (node.has("affiliation") && !node.get("affiliation").isNull())
-                        stats.put("affiliation", node.get("affiliation").asText());
-
-                    // Gera stats baseados na posição se ki não existir
-                    if (!stats.containsKey("ki")) {
-                        int base = 50 + (node.has("id") ? node.get("id").asInt() * 5 : 0);
-                        stats.put("power", String.valueOf(base));
-                    }
-
-                    String imageUrl = "";
-                    if (node.has("image") && !node.get("image").isNull())
-                        imageUrl = node.get("image").asText();
-
-                    characters.add(Character.builder()
-                            .id(node.has("id") ? node.get("id").asText() : String.valueOf(characters.size()))
-                            .name(node.has("name") ? node.get("name").asText() : "Unknown")
-                            .imageUrl(imageUrl)
-                            .type(node.has("race") ? node.get("race").asText() : "Unknown")
-                            .stats(stats)
-                            .build());
-                }
-            }
-            return characters;
-        } catch (Exception e) {
-            log.error("Error fetching Dragon Ball characters", e);
-            return new ArrayList<>();
-        }
-    }
-
-    // =========================================================
-    // NARUTO — narutodb.xyz/api/character (URL ATUALIZADA)
-    // Resposta: { "characters": [ { id, name, images[], rank, personal } ] }
-    // =========================================================
-    private List<Character> fetchNarutoCharacters(int limit, int offset) {
-        try {
-            int page = (offset / limit) + 1;
-            String url = "https://narutodb.xyz/api/character?page=" + page + "&limit=" + limit;
-            log.info("Fetching Naruto from: {}", url);
-
-            JsonNode root = objectMapper.readTree(restTemplate.getForObject(url, String.class));
-            JsonNode charactersNode = root.get("characters");
-
-            List<Character> characters = new ArrayList<>();
-            if (charactersNode != null && charactersNode.isArray()) {
-                for (JsonNode node : charactersNode) {
-                    Map<String, String> stats = new HashMap<>();
-
-                    // Rank ninja
-                    if (node.has("rank") && !node.get("rank").isNull()) {
-                        JsonNode rank = node.get("rank");
-                        if (rank.has("ninjaRank") && !rank.get("ninjaRank").isNull()) {
-                            // ninjaRank é objeto com chaves como "Part I", "Part II"
-                            JsonNode ninjaRank = rank.get("ninjaRank");
-                            ninjaRank.fields().forEachRemaining(entry ->
-                                stats.put("rank_" + entry.getKey(), entry.getValue().asText())
-                            );
-                        }
-                    }
-
-                    // Personal info (sexo, afiliação, clã)
-                    if (node.has("personal") && !node.get("personal").isNull()) {
-                        JsonNode personal = node.get("personal");
-                        if (personal.has("sex")) stats.put("sex", personal.get("sex").asText());
-                        if (personal.has("affiliation")) stats.put("affiliation", personal.get("affiliation").asText());
-                        if (personal.has("clan")) stats.put("clan", personal.get("clan").asText());
-                    }
-
-                    // Jutsu count como proxy de poder
-                    if (node.has("jutsu") && node.get("jutsu").isArray()) {
-                        stats.put("jutsu_count", String.valueOf(node.get("jutsu").size() * 10));
-                    }
-
-                    // Imagem
-                    String imageUrl = "";
-                    if (node.has("images") && node.get("images").isArray() && node.get("images").size() > 0) {
-                        imageUrl = node.get("images").get(0).asText();
-                    }
-
-                    // Tipo = rank mais recente ou "Ninja"
-                    String type = "Ninja";
-                    if (node.has("rank") && !node.get("rank").isNull()) {
-                        JsonNode rank = node.get("rank");
-                        if (rank.has("ninjaRank") && !rank.get("ninjaRank").isNull()) {
-                            JsonNode ninjaRank = rank.get("ninjaRank");
-                            if (ninjaRank.fields().hasNext()) {
-                                type = ninjaRank.fields().next().getValue().asText();
-                            }
-                        }
-                    }
-
-                    characters.add(Character.builder()
-                            .id(String.valueOf(node.has("id") ? node.get("id").asInt() : characters.size()))
-                            .name(node.has("name") ? node.get("name").asText() : "Unknown")
-                            .imageUrl(imageUrl)
-                            .type(type)
-                            .stats(stats)
-                            .build());
-                }
-            }
-            return characters;
-        } catch (Exception e) {
-            log.error("Error fetching Naruto characters", e);
-            return new ArrayList<>();
-        }
-    }
-
-    // =========================================================
-    // DEMON SLAYER — demon-slayer-api-9c6c.onrender.com
-    // Resposta: [ { name, affiliation, race, quote }, ... ]
-    // =========================================================
-    private List<Character> fetchDemonSlayerCharacters(int limit, int offset) {
-        try {
-            // Esta API não tem paginação, retorna todos
-            String url = "https://demon-slayer-api-9c6c.onrender.com/api/v1/characters";
-            log.info("Fetching Demon Slayer from: {}", url);
-
-            JsonNode root = objectMapper.readTree(restTemplate.getForObject(url, String.class));
-
-            List<Character> characters = new ArrayList<>();
-            if (root != null && root.isArray()) {
-                int count = 0;
-                for (int i = offset; i < root.size() && count < limit; i++, count++) {
-                    JsonNode node = root.get(i);
-
-                    Map<String, String> stats = generateDemonSlayerStats(
-                        node.has("affiliation") ? node.get("affiliation").asText() : "",
-                        i
-                    );
-
-                    if (node.has("race") && !node.get("race").isNull())
-                        stats.put("race", node.get("race").asText());
-                    if (node.has("affiliation") && !node.get("affiliation").isNull())
-                        stats.put("affiliation", node.get("affiliation").asText());
-
-                    characters.add(Character.builder()
-                            .id(String.valueOf(i))
-                            .name(node.has("name") ? node.get("name").asText() : "Unknown")
-                            .imageUrl(node.has("img") ? node.get("img").asText() :
-                                     node.has("image") ? node.get("image").asText() : "")
-                            .type(node.has("affiliation") ? node.get("affiliation").asText() : "Demon Slayer")
-                            .stats(stats)
-                            .build());
-                }
-            }
-            return characters;
-        } catch (Exception e) {
-            log.error("Error fetching Demon Slayer characters", e);
-            return new ArrayList<>();
-        }
-    }
-
-    /**
-     * Stats de Demon Slayer baseados na afiliação (proxy de poder)
-     */
-    private Map<String, String> generateDemonSlayerStats(String affiliation, int index) {
-        int base = switch (affiliation.toLowerCase()) {
-            case "demon slayer corps" -> 60;
-            case "hashira"            -> 100;
-            case "twelve kizuki"      -> 90;
-            case "demon"              -> 70;
-            default                   -> 40;
-        };
-        int seed = index % 20;
-        Map<String, String> stats = new HashMap<>();
-        stats.put("attack",  String.valueOf(base + seed));
-        stats.put("defense", String.valueOf(base + (seed * 2 % 20)));
-        stats.put("speed",   String.valueOf(base + (seed * 3 % 20)));
-        return stats;
-    }
-
-    // =========================================================
-    // JIKAN (MyAnimeList)
+    // JIKAN — todos os universos via MyAnimeList
+    // Dragon Ball (813), Naruto (20), Demon Slayer (38000) + outros
     // =========================================================
     private List<Character> fetchJikanCharacters(Universe universe, int limit, int offset) {
         try {
@@ -455,12 +256,14 @@ public class MultiverseService {
                     JsonNode charNode = node.get("character");
 
                     Map<String, String> stats = new HashMap<>();
-                    if (charNode.has("url"))
-                        stats.put("mal_url", charNode.get("url").asText());
 
-                    // Favorites como proxy de poder (personagem popular = mais forte canonicamente)
-                    if (node.has("favorites"))
+                    // Favorites como proxy de poder
+                    if (node.has("favorites") && !node.get("favorites").isNull())
                         stats.put("favorites", node.get("favorites").asText());
+
+                    // Voice actors count como stat extra
+                    if (node.has("voice_actors") && node.get("voice_actors").isArray())
+                        stats.put("voice_actors", String.valueOf(node.get("voice_actors").size() * 5));
 
                     characters.add(Character.builder()
                             .id(charNode.get("mal_id").asText())
