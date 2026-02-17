@@ -8,7 +8,7 @@ import {
 } from "../types";
 import { api } from "../services/api";
 
-const MAX_CHARACTERS = 8; // ← Máximo de personagens para comparar
+const MAX_CHARACTERS = 8;
 
 export default function MultiverseExplorer() {
   const [selectedUniverse, setSelectedUniverse] = useState<Universe>("POKEMON");
@@ -20,13 +20,12 @@ export default function MultiverseExplorer() {
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // ✅ SCROLL INFINITO
+  // SCROLL INFINITO
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const observerTarget = useRef<HTMLDivElement>(null);
 
-  // ✅ CARREGAR PERSONAGENS COM PAGINAÇÃO
   const loadCharacters = useCallback(
     async (universe: Universe, pageNum: number, append = false) => {
       if (pageNum === 0) {
@@ -34,13 +33,11 @@ export default function MultiverseExplorer() {
       } else {
         setLoadingMore(true);
       }
-
       setError(null);
 
       try {
         const limit = 50;
         const offset = pageNum * limit;
-
         const data = await api.getCharacters(universe, limit, offset);
 
         if (append) {
@@ -61,7 +58,6 @@ export default function MultiverseExplorer() {
     [],
   );
 
-  // ✅ CARREGAR PRIMEIRA PÁGINA AO MUDAR UNIVERSO
   useEffect(() => {
     setPage(0);
     setHasMore(true);
@@ -70,7 +66,6 @@ export default function MultiverseExplorer() {
     loadCharacters(selectedUniverse, 0, false);
   }, [selectedUniverse, loadCharacters]);
 
-  // ✅ INTERSECTION OBSERVER PARA SCROLL INFINITO
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -94,7 +89,6 @@ export default function MultiverseExplorer() {
     };
   }, [hasMore, loading, loadingMore, page, selectedUniverse, loadCharacters]);
 
-  // ✅ SELECIONAR/DESELECIONAR PERSONAGEM
   const handleSelectCharacter = (character: Character) => {
     if (selectedCharacters.some((c) => c.id === character.id)) {
       setSelectedCharacters(
@@ -107,15 +101,12 @@ export default function MultiverseExplorer() {
     }
   };
 
-  // ✅ COMPARAR PERSONAGENS
+  // ✅ CORRIGIDO: manda a lista inteira de personagens
   const handleCompare = async () => {
     if (selectedCharacters.length < 2) return;
 
     try {
-      const result = await api.compareCharacters(
-        selectedCharacters[0],
-        selectedCharacters[1],
-      );
+      const result = await api.compareCharacters(selectedCharacters);
       setComparison(result);
       setShowModal(true);
     } catch (err) {
@@ -123,12 +114,10 @@ export default function MultiverseExplorer() {
     }
   };
 
-  // ✅ FILTRAR PERSONAGENS
   const filteredCharacters = characters.filter((character) =>
     character.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  // ✅ ANIMAÇÕES
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -292,6 +281,96 @@ export default function MultiverseExplorer() {
           </div>
         )}
       </div>
+
+      {/* MODAL DE COMPARAÇÃO */}
+      <AnimatePresence>
+        {showModal && comparison && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="bg-gray-900 rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-3xl font-bold text-white">⚔️ Resultado</h2>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="text-gray-400 hover:text-white text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* VENCEDOR */}
+              <div className="text-center mb-8 p-6 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl">
+                <p className="text-white text-lg mb-2">🏆 Vencedor</p>
+                <h3 className="text-4xl font-bold text-white">
+                  {comparison.winner.name}
+                </h3>
+              </div>
+
+              {/* ANÁLISE */}
+              {comparison.analysis && (
+                <p className="text-gray-300 text-center mb-6 italic">
+                  {comparison.analysis}
+                </p>
+              )}
+
+              {/* RANKING */}
+              <div className="space-y-3">
+                {comparison.ranking.map((char, index) => (
+                  <div
+                    key={char.id}
+                    className={`flex items-center gap-4 p-4 rounded-xl ${
+                      index === 0
+                        ? "bg-gradient-to-r from-yellow-500 to-orange-500"
+                        : index === 1
+                          ? "bg-gradient-to-r from-gray-400 to-gray-500"
+                          : index === 2
+                            ? "bg-gradient-to-r from-orange-700 to-orange-800"
+                            : "bg-gray-700"
+                    }`}
+                  >
+                    <div className="text-3xl font-bold w-10 text-center">
+                      {index === 0
+                        ? "🥇"
+                        : index === 1
+                          ? "🥈"
+                          : index === 2
+                            ? "🥉"
+                            : `#${index + 1}`}
+                    </div>
+                    <img
+                      src={char.imageUrl}
+                      alt={char.name}
+                      className="w-14 h-14 rounded-full object-cover"
+                    />
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-white">
+                        {char.name}
+                      </h4>
+                      <p className="text-sm opacity-80 text-white">
+                        {char.type}
+                      </p>
+                    </div>
+                    <div className="text-xl font-bold text-white">
+                      {char.totalPower} pts
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
