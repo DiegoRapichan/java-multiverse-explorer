@@ -12,7 +12,7 @@ public enum Universe {
     // Via Jikan API (MyAnimeList) - todos os demais usam o anime ID
     DRAGON_BALL("Dragon Ball Z", "https://api.jikan.moe/v4", "813"),
     NARUTO("Naruto", "https://api.jikan.moe/v4", "20"),
-    DEMON_SLAYER("Demon Slayer", "https://api.jikan.moe/v4", "38000"),
+    DEMON_SLAYER("Demon Slayer", "https://api.jikan.moe/v4", "47778"),
     MY_HERO_ACADEMIA("My Hero Academia", "https://api.jikan.moe/v4", "31964"),
     ONE_PIECE("One Piece", "https://api.jikan.moe/v4", "21"),
     ATTACK_ON_TITAN("Attack on Titan", "https://api.jikan.moe/v4", "16498"),
