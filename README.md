@@ -1,297 +1,134 @@
-# 🌌 Multiverse Data Explorer
+# Multiverse Data Explorer
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen?style=for-the-badge&logo=vercel)](https://java-multiverse-explorer.vercel.app/)
-[![API Docs](https://img.shields.io/badge/API-Docs-blue?style=for-the-badge&logo=swagger)](https://multiverse-explorer-api.onrender.com/swagger-ui.html)
+> Plataforma full stack de integração e comparação cross-API — unifica dados de 3 APIs públicas distintas (PokeAPI, Digimon API, Jikan/MyAnimeList) em um modelo de dados comum, implementa cache em memória com TTL, rate limiting por API e algoritmo de scoring cross-domain para comparação de entidades de universos diferentes.
 
-[![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2.2-6DB33F?style=for-the-badge&logo=spring&logoColor=white)](https://spring.io/projects/spring-boot)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind](https://img.shields.io/badge/Tailwind-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+![Java](https://img.shields.io/badge/Java_17-ED8B00?style=flat&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot_3.2-6DB33F?style=flat&logo=springboot&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript_5.3-3178C6?style=flat&logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React_18-61DAFB?style=flat&logo=react&logoColor=black)
+![Guava](https://img.shields.io/badge/Guava_Cache-4285F4?style=flat&logo=google&logoColor=white)
 
-> Plataforma unificada para explorar, comparar e descobrir personagens de **58 universos de anime**. Pokémon, Digimon, Dragon Ball, Naruto, One Piece e muito mais em uma única aplicação!
-
-**🌐 [Demo ao Vivo](https://java-multiverse-explorer.vercel.app/)** | **📖 [API Docs](https://multiverse-explorer-api.onrender.com/swagger-ui.html)** | **🔌 [API Health](https://multiverse-explorer-api.onrender.com/api/multiverse/health)**
+**[🚀 App ao Vivo](https://java-multiverse-explorer.vercel.app)** • **[📖 Swagger UI](https://multiverse-explorer-api.onrender.com/swagger-ui.html)** • **[🔌 API](https://multiverse-explorer-api.onrender.com/api/multiverse)**
 
 ---
 
-## 📸 Screenshots
+## 🛠️ Stack
 
-### Seleção de Pokémon
-
-![Pokémon Universe](screenshots/multiverse-pokemon.PNG)
-_Interface moderna com grid de personagens e busca em tempo real_
-
-### Seleção de Digimon
-
-![Digimon Universe](screenshots/multiverse-digimon.PNG)
-_Alternância fluida entre 58 universos com design cyberpunk azul_
-
-### Comparação de Batalha
-
-![Battle Comparison](screenshots/multiverse-result-comparation.PNG)
-_Análise estatística visual com gráficos radar, ranking de poder e identificação do vencedor_
-
-### Responsividade
-
-![Responsive](screenshots/multiverse-responsive.PNG)
-_Layout adaptável para desktop, tablet e mobile_
+| Camada           | Tecnologias                                                                            |
+| ---------------- | -------------------------------------------------------------------------------------- |
+| **Backend**      | Java 17 · Spring Boot 3.2 · Spring Web · Guava Cache · RestTemplate · Lombok · Jackson |
+| **Documentação** | SpringDoc OpenAPI / Swagger                                                            |
+| **Frontend**     | React 18 · TypeScript 5.3 · Vite · Tailwind CSS · Recharts · Framer Motion · Axios     |
+| **Deploy**       | Render (backend) · Vercel (frontend)                                                   |
 
 ---
 
-## 📋 Sobre o Projeto
+## ⚙️ Destaques Técnicos
 
-Uma aplicação **full-stack moderna** que integra APIs públicas de 58 universos de anime em uma plataforma unificada para exploração e comparação de personagens. Compare Goku vs Naruto vs Luffy vs Pikachu em um único lugar!
+**Modelo de dados unificado para 3 APIs heterogêneas**
+PokeAPI, Digimon API e Jikan retornam estruturas completamente diferentes. O `MultiverseService` normaliza tudo para um único modelo `Character` — `id`, `name`, `imageUrl`, `type` e `stats: Map<String, String>`. Essa abstração permite que o algoritmo de comparação opere de forma agnóstica à fonte, sem ramificações por universo na camada de negócio.
 
-### 🎯 Por que este projeto se destaca:
+**Cache Guava com TTL de 30 minutos**
+Respostas das 3 APIs são cacheadas em memória com Guava Cache (máximo 1.000 entradas, TTL 30min). APIs externas — especialmente PokeAPI com 1.000+ Pokémon — têm latência variável. O cache garante resposta rápida após a primeira requisição e evita sobrecarga nas APIs de origem.
 
-- 🌌 **58 Universos** - De Pokémon e Digimon aos tops do MyAnimeList
-- 🎨 **Design Neo-Arcade Cyberpunk** - Interface futurista com tema azul/cyan
-- ⚡ **Performance Otimizada** - Cache Guava com TTL de 30 minutos
-- 📊 **Visualizações Interativas** - Gráficos Radar para comparação de stats
-- 🔄 **Integração Multi-API** - PokeAPI + Digimon API + Jikan (MyAnimeList)
-- 🎯 **Comparação Cross-Universe** - Compare até 8 personagens de universos diferentes!
-- 🎮 **UX Gamificada** - Animações suaves com Framer Motion
-- ♾️ **Scroll Infinito** - Carregamento paginado automático de personagens
-- 🌐 **Deploy Profissional** - Frontend na Vercel + Backend no Render
+**Rate limiting explícito para Jikan API**
+Jikan (wrapper não-oficial do MyAnimeList) impõe limite de 3 req/s. O serviço aplica delay de 350ms entre chamadas — simples e eficaz para respeitar o contrato da API sem biblioteca externa de throttling.
 
----
+**Algoritmo de scoring cross-domain**
+O desafio central: como comparar Pokémon (stats numéricos reais), Digimons (base por level com variação determinística) e personagens de anime (sem stats reais)? Três métodos distintos em `calculatePower()`, cada um calibrado para a natureza dos dados disponíveis por API.
 
-## ✨ Funcionalidades
+**Paginação server-side com scroll infinito**
+O endpoint `/{universe}/characters?limit=50&offset=0` suporta paginação. O frontend consome com scroll infinito — carrega o próximo lote automaticamente ao atingir o fim da lista.
 
-### 🎮 Universos Disponíveis (58 total)
-
-#### APIs Próprias
-
-| Universo    | Personagens | Features                                      |
-| ----------- | ----------- | --------------------------------------------- |
-| **Pokémon** | 1000+       | Stats reais (HP, ATK, DEF, SPD...), tipos     |
-| **Digimon** | 250+        | Stats por level (Fresh→Ultra), determinístico |
-
-#### Via Jikan API (MyAnimeList)
-
-| Categoria       | Universos                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Shonen Clássico | Dragon Ball Z, Dragon Ball GT, Naruto, Naruto Shippuden, Bleach, Bleach TYBW, One Piece, Fairy Tail, Saint Seiya, Yu Yu Hakusho, Inuyasha                                                                                                                                                                                                                                                                                                              |
-| Shonen Moderno  | Demon Slayer, My Hero Academia, Attack on Titan, Jujutsu Kaisen, Chainsaw Man, Black Clover, Hunter x Hunter, One Punch Man, Mob Psycho 100, Solo Leveling, Blue Lock, Dandadan                                                                                                                                                                                                                                                                        |
-| Ação / Aventura | FMA Brotherhood, Death Note, Sword Art Online, Tokyo Ghoul, Berserk, Code Geass, Vinland Saga, Akame ga Kill, Seven Deadly Sins, Re:Zero, Overlord, Rising of Shield Hero, Hell's Paradise, Fire Force, Dororo, Parasyte, Steins;Gate, Neon Genesis Evangelion, Cowboy Bebop, Samurai Champloo, Fate/Zero, Psycho-Pass, JoJo's Bizarre Adventure, Promised Neverland, Dr. Stone, Mushoku Tensei, Tensura, Cyberpunk Edgerunners, Spy x Family, Frieren |
-| Outros          | Haikyuu!!, SAO II                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-
-### 🔥 Features Principais
-
-- ✅ **58 Universos** - Todos os top animes do MyAnimeList/IMDB
-- ✅ **Comparação de até 8 personagens** - Cross-universe battle royale
-- ✅ **Scroll Infinito** - Carregamento automático paginado
-- ✅ **Busca em Tempo Real** - Filtre personagens instantaneamente
-- ✅ **Sistema de Poder Inteligente** - favorites MAL + fallback por posição + role bonus
-- ✅ **Ranking de Poder** - 🥇🥈🥉 com pontuação detalhada
-- ✅ **Gráficos Radar** - Comparação visual de stats (1v1)
-- ✅ **Cache Inteligente** - Respostas rápidas sem sobrecarregar APIs externas
-- ✅ **Rate Limiting** - Respeita limites da Jikan API (350ms entre requests)
-- ✅ **Interface Responsiva** - Desktop, tablet e mobile
-
-### 🧮 Sistema de Poder
-
-| Universo | Método                                               | Exemplo                     |
-| -------- | ---------------------------------------------------- | --------------------------- |
-| Pokémon  | Stats reais da PokeAPI (soma de HP+ATK+DEF+...)      | Mewtwo: 680 pts             |
-| Digimon  | Base por level + variação determinística por índice  | Agumon (Rookie): ~40-59 pts |
-| Jikan    | MAL favorites + role bonus (Main+500/Supporting+100) | Goku: ~85.500 pts           |
+**TypeScript end-to-end no frontend**
+Types explícitos para `Character`, `Universe` e `ComparisonResult`. `UNIVERSE_CONFIG` centraliza os 58 universos com IDs Jikan e metadados — adicionar um novo universo é uma linha no config, sem tocar em lógica de negócio.
 
 ---
 
-## 🚀 Tech Stack
+## 🧮 Algoritmo de Scoring Cross-Domain
 
-### 🔴 Backend (API REST)
-
-```
-Java 17 + Spring Boot 3.2.2
-├── Spring Web (REST Controllers)
-├── Guava Cache (Cache em memória, TTL 30min)
-├── RestTemplate (HTTP Client)
-├── SpringDoc OpenAPI (Swagger)
-├── Lombok (Boilerplate Reduction)
-└── Jackson (JSON Processing)
-```
-
-**Deploy:** Render - [https://multiverse-explorer-api.onrender.com](https://multiverse-explorer-api.onrender.com)
-
-### 🔵 Frontend (Web Interface)
+O problema central do projeto: entidades de APIs diferentes têm dados incomparáveis por natureza. A solução é um `calculatePower()` com três estratégias distintas:
 
 ```
-React 18 + TypeScript 5.3
-├── Vite 5.0 (Build Tool)
-├── Tailwind CSS 3.4 (Styling)
-├── Framer Motion 11.0 (Animations)
-├── Recharts 2.10 (Radar Charts)
-├── Axios 1.6 (HTTP Client)
-└── React Icons 5.0 (UI Icons)
+calculatePower(character, universe):
+
+  POKEMON:
+    retorna soma de todos os valores numéricos em character.stats
+    // HP + ATK + DEF + SP_ATK + SP_DEF + SPD — stats reais da PokeAPI
+    // Ex: Mewtwo → 680 pts
+
+  DIGIMON:
+    base = tabelaBaseLevel[character.level]
+    // Fresh=10, In-Training=20, Rookie=40, Champion=80, Ultimate=120, Mega=160, Ultra=200
+    retorna base + (character.index % 20)
+    // Variação determinística — mesma entrada sempre produz mesmo resultado
+    // Ex: Agumon (Rookie, index=5) → 45 pts
+
+  JIKAN (anime via MyAnimeList):
+    score = character.malFavorites      // popularidade real no MAL
+    se role == "Main":        score += 500
+    se role == "Supporting":  score += 100
+    retorna score
+    // Aproximação por popularidade quando não existem stats reais
+    // Ex: Goku → ~85.500 pts
 ```
 
-**Deploy:** Vercel - [https://java-multiverse-explorer.vercel.app](https://java-multiverse-explorer.vercel.app)
+**Comparação cross-universe (`POST /compare`):**
+Aceita 2 a 8 personagens de qualquer combinação de universos. Cada um passa por `calculatePower()` com sua lógica específica. O resultado inclui ranking ordenado, identificação do vencedor e texto descritivo — calculado inteiramente no backend.
 
 ---
 
-## 🏗️ Arquitetura
+## 🌐 Integração com APIs Externas
 
-### Fluxo de Dados
+| API             | Cobertura                    | Dados utilizados                                                  |
+| --------------- | ---------------------------- | ----------------------------------------------------------------- |
+| **PokeAPI**     | 1.000+ Pokémon               | Stats reais (HP, ATK, DEF, SP_ATK, SP_DEF, SPD), tipos, imagens   |
+| **Digimon API** | 250+ Digimons                | Nome, level (Fresh → Ultra), imagem                               |
+| **Jikan API**   | 56 universos via MyAnimeList | Personagens por anime ID, favorites count, role (Main/Supporting) |
 
-```
-┌─────────────────────────────────────────────────────┐
-│   Frontend React (Vercel)                           │
-│   ├── MultiverseExplorer Component                  │
-│   ├── Universe Selector (58 universos)              │
-│   ├── Character Grid + Scroll Infinito              │
-│   ├── Comparação até 8 personagens                  │
-│   └── Modal: Ranking + Radar Chart + Análise        │
-└──────────────────────┬──────────────────────────────┘
-                       │ HTTPS/REST
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│   Backend Spring Boot (Render)                      │
-│   ├── MultiverseController (REST Endpoints)         │
-│   ├── MultiverseService (Business Logic)            │
-│   │   ├── calculatePower() - Sistema de poder       │
-│   │   ├── compareCharacters() - Ranking 1-8        │
-│   │   └── Rate Limiting (Jikan: 350ms delay)        │
-│   └── Guava Cache (30min TTL, max 1000 entries)     │
-└──────────┬──────────────────┬───────────────────────┘
-           │                  │
-    ┌──────┴──────┐    ┌──────┴──────────────┐
-    ▼             ▼    ▼                     ▼
-┌────────┐ ┌─────────┐ ┌───────────────────────────┐
-│PokeAPI │ │Digimon  │ │  Jikan API (MyAnimeList)  │
-│1000+   │ │API 250+ │ │  56 universos via anime ID │
-│Pokémons│ │Digimons │ │  + Rate Limiting 3req/seg  │
-└────────┘ └─────────┘ └───────────────────────────┘
-```
-
-### Estrutura de Dados
-
-```java
-// Model unificado para todos os universos
-Character {
-  id:       String              // Identificador único
-  name:     String              // Nome do personagem
-  imageUrl: String              // URL da imagem oficial
-  type:     String              // Tipo/role (fire, Rookie, Main...)
-  stats:    Map<String,String>  // stats numéricos para calculatePower()
-}
-
-// Resultado da comparação (2-8 personagens)
-ComparisonResult {
-  winner:   Character           // Personagem com maior totalPower
-  analysis: String              // Texto descritivo do resultado
-  ranking:  List<RankedCharacter> {
-    id, name, imageUrl, type,
-    totalPower: int,            // Soma dos stats numéricos
-    position:   int             // 1º, 2º, 3º...
-  }
-}
-```
+Os 58 universos abrangem Dragon Ball, Naruto, One Piece, Attack on Titan, Demon Slayer, Jujutsu Kaisen, entre outros — todos mapeados no `UNIVERSE_CONFIG` do frontend com seus respectivos IDs Jikan.
 
 ---
 
-## 🔧 Instalação Local
+## 🔌 Endpoints da API
 
-### Pré-requisitos
+```
+Base URL: https://multiverse-explorer-api.onrender.com/api/multiverse
+
+GET  /universes                           Lista os 58 universos disponíveis
+GET  /{universe}/characters?limit&offset  Personagens com paginação (scroll infinito)
+GET  /{universe}/characters/{name}        Busca personagem por nome
+POST /compare                             Compara 2 a 8 personagens cross-universe
+GET  /health                              Health check
+```
+
+**Exemplo — comparação cross-universe:**
 
 ```bash
-java --version    # Java 17+
-node --version    # Node.js 18+
-npm --version     # npm 9+
-```
-
-### Quick Start
-
-#### 1️⃣ Clone o repositório
-
-```bash
-git clone https://github.com/DiegoRapichan/java-multiverse-explorer.git
-cd java-multiverse-explorer
-```
-
-#### 2️⃣ Backend (Terminal 1)
-
-```bash
-cd backend
-
-# Windows
-mvnw.cmd spring-boot:run
-
-# Linux/Mac
-./mvnw spring-boot:run
-```
-
-✅ **Backend:** `http://localhost:8080`  
-📚 **Swagger:** `http://localhost:8080/swagger-ui.html`
-
-#### 3️⃣ Frontend (Terminal 2)
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-✅ **Frontend:** `http://localhost:5173`
-
-> ⚠️ O Render hiberna serviços gratuitos após inatividade. A primeira requisição pode levar 30-60s para o backend "acordar".
-
----
-
-## 📚 API Endpoints
-
-### Base URL
-
-```
-Produção: https://multiverse-explorer-api.onrender.com/api/multiverse
-Local:    http://localhost:8080/api/multiverse
-```
-
-### Endpoints
-
-```http
-# Listar todos os universos disponíveis
-GET /universes
-
-# Listar personagens com paginação (scroll infinito)
-GET /{universe}/characters?limit=50&offset=0
-
-# Buscar personagem por nome
-GET /{universe}/characters/{name}
-
-# Comparar 2 a 8 personagens
-POST /compare
-Body: { "characters": [ {...}, {...}, ... ] }
-
-# Health check
-GET /health
-```
-
-### Exemplo de Comparação
-
-```bash
-curl -X POST https://multiverse-explorer-api.onrender.com/api/multiverse/compare \
+curl -X POST .../api/multiverse/compare \
   -H "Content-Type: application/json" \
   -d '{
     "characters": [
-      { "id": "149", "name": "dragonite", "imageUrl": "...", "type": "dragon", "stats": {"hp":"91","attack":"134"} },
-      { "id": "6",   "name": "charizard",  "imageUrl": "...", "type": "fire",   "stats": {"hp":"78","attack":"84"} }
+      { "id": "149", "name": "dragonite", "type": "dragon",
+        "stats": {"hp":"91","attack":"134","defense":"95","speed":"80"} },
+      { "id": "6", "name": "charizard", "type": "fire",
+        "stats": {"hp":"78","attack":"84","defense":"78","speed":"100"} }
     ]
   }'
 ```
 
 ```json
 {
-  "winner": { "name": "dragonite", ... },
-  "analysis": "dragonite vence com 600 pts. Ranking: 1º dragonite (600 pts), 2º charizard (534 pts).",
+  "winner": { "name": "dragonite" },
   "ranking": [
     { "name": "dragonite", "totalPower": 600, "position": 1 },
-    { "name": "charizard",  "totalPower": 534, "position": 2 }
-  ]
+    { "name": "charizard", "totalPower": 534, "position": 2 }
+  ],
+  "analysis": "dragonite vence com 600 pts."
 }
 ```
+
+Documentação interativa completa: **[Swagger UI](https://multiverse-explorer-api.onrender.com/swagger-ui.html)**
 
 ---
 
@@ -299,128 +136,88 @@ curl -X POST https://multiverse-explorer-api.onrender.com/api/multiverse/compare
 
 ```
 java-multiverse-explorer/
-│
-├── backend/
-│   └── src/main/java/com/multiverse/
-│       ├── controller/
-│       │   └── MultiverseController.java    # GET /characters, POST /compare
-│       ├── service/
-│       │   └── MultiverseService.java       # Lógica + cache + poder
-│       ├── model/
-│       │   ├── Character.java               # Model unificado
-│       │   ├── Universe.java                # 58 universos (enum)
-│       │   └── ComparisonResult.java        # Resultado com ranking
-│       └── config/                          # CORS, Swagger
+├── backend/src/main/java/com/multiverse/
+│   ├── controller/
+│   │   └── MultiverseController.java    # Endpoints REST
+│   ├── service/
+│   │   └── MultiverseService.java       # Integração APIs + Guava Cache + calculatePower()
+│   ├── model/
+│   │   ├── Character.java               # Modelo unificado cross-API
+│   │   ├── Universe.java                # Enum com 58 universos
+│   │   └── ComparisonResult.java        # Resultado com ranking
+│   └── config/                          # CORS, Swagger, Guava Cache config
 │
 └── frontend/src/
     ├── components/
-    │   └── MultiverseExplorer.tsx           # Componente principal
+    │   └── MultiverseExplorer.tsx        # Grid + comparação + gráfico Radar
     ├── services/
-    │   └── api.ts                           # Axios client
+    │   └── api.ts                        # Axios client
     └── types/
-        └── index.ts                         # Types + UNIVERSE_CONFIG (58 universos)
+        └── index.ts                      # Types + UNIVERSE_CONFIG (58 universos)
 ```
 
 ---
 
-## 🚀 Deploy
+## 📸 Screenshots
 
-### Backend - Render
+**Seleção de universo e grid de personagens**
+![Universe Selection](docs/screenshots/dashboard.png)
 
-**URL:** [https://multiverse-explorer-api.onrender.com](https://multiverse-explorer-api.onrender.com)
+**Comparação cross-universe com gráfico Radar**
+![Battle Comparison](docs/screenshots/adding-materials.png)
 
-```yaml
-# render.yaml
-services:
-  - type: web
-    name: multiverse-explorer-api
-    runtime: docker
-    rootDir: backend
-```
-
-### Frontend - Vercel
-
-**URL:** [https://java-multiverse-explorer.vercel.app](https://java-multiverse-explorer.vercel.app)
-
-```
-Framework: Vite
-Root Directory: frontend
-Build Command: npm run build
-Output Directory: dist
-
-Variável de ambiente:
-VITE_API_URL=https://multiverse-explorer-api.onrender.com/api/multiverse
-```
+**Interface responsiva**
+![Responsive](docs/screenshots/raw-materials.png)
 
 ---
 
-## 🎯 Roadmap
+## 🚀 Como Rodar Localmente
 
-### ✅ Fase 1: MVP
+**Pré-requisitos:** Java 17+, Node.js 18+, Maven
 
-- [x] Backend Spring Boot com cache Guava
-- [x] Integração PokeAPI (stats reais)
-- [x] Integração Digimon API (stats por level)
-- [x] Frontend React + TypeScript + design cyberpunk azul
-- [x] Comparação com gráficos Radar
-- [x] Deploy Render + Vercel
+```bash
+# 1. Clone
+git clone https://github.com/DiegoRapichan/java-multiverse-explorer.git
+cd java-multiverse-explorer
 
-### ✅ Fase 2: Expansão (Concluído)
+# 2. Backend
+cd backend
+./mvnw spring-boot:run
+# API em http://localhost:8080
+# Swagger em http://localhost:8080/swagger-ui.html
 
-- [x] 58 universos via Jikan API (MyAnimeList)
-- [x] Comparação de até 8 personagens
-- [x] Scroll infinito com paginação
-- [x] Sistema de poder inteligente (favorites + posição + role)
-- [x] Ranking 🥇🥈🥉 com pontuação
-- [x] Rate limiting para Jikan API
+# 3. Frontend (novo terminal)
+cd frontend
+npm install
+# Configure .env:
+# VITE_API_URL=http://localhost:8080/api/multiverse
+npm run dev
+# App em http://localhost:5173
+```
 
-### 🔮 Fase 3: Planejado
+> ⚠️ O Render hiberna serviços gratuitos após inatividade. A primeira requisição pode levar 30–60s para o backend "acordar".
 
-- [ ] Filtros por tipo/poder/universo
-- [ ] Favoritos com localStorage
-- [ ] Histórico de comparações
-- [ ] PWA (Progressive Web App)
-- [ ] Testes unitários (JUnit + React Testing Library)
-- [ ] CI/CD com GitHub Actions
+---
+
+## 🌐 Deploy
+
+| Serviço     | URL                                                          |
+| ----------- | ------------------------------------------------------------ |
+| Frontend    | https://java-multiverse-explorer.vercel.app                  |
+| Backend API | https://multiverse-explorer-api.onrender.com                 |
+| Swagger UI  | https://multiverse-explorer-api.onrender.com/swagger-ui.html |
 
 ---
 
 ## 👨‍💻 Autor
 
-<div align="center">
+**Diego Rapichan** — Desenvolvedor Full Stack · Java/Spring Boot + Node.js + React
 
-### **Diego Colombari Rapichan**
-
-Desenvolvedor Full Stack — Java/Spring Boot + React/TypeScript
-
-[![GitHub](https://img.shields.io/badge/GitHub-DiegoRapichan-181717?style=for-the-badge&logo=github)](https://github.com/DiegoRapichan)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Diego_Rapichan-0077B5?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/diego-rapichan)
-[![Email](https://img.shields.io/badge/Email-direrapichan@gmail.com-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:direrapichan@gmail.com)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-diego--rapichan-0077B5?style=flat&logo=linkedin)](https://linkedin.com/in/diego-rapichan)
+[![GitHub](https://img.shields.io/badge/GitHub-DiegoRapichan-181717?style=flat&logo=github)](https://github.com/DiegoRapichan)
 
 📍 Apucarana, Paraná — Brasil
 
-</div>
-
 ---
 
-## 🙏 Agradecimentos
-
-- **[PokeAPI](https://pokeapi.co/)** — Stats reais de 1000+ Pokémon
-- **[Digimon API](https://digimon-api.vercel.app/)** — 250+ Digimons
-- **[Jikan API](https://jikan.moe/)** — MyAnimeList não-oficial, 56 universos
-- **[Spring Boot](https://spring.io/)** — Framework backend robusto
-- **[React](https://react.dev/)** + **[Framer Motion](https://www.framer.com/motion/)** — UI fluida e animada
-- **[Recharts](https://recharts.org/)** — Gráficos Radar interativos
-- **[Render](https://render.com/)** + **[Vercel](https://vercel.com/)** — Deploy gratuito
-
----
-
-<div align="center">
-
-## ⭐ Se este projeto foi útil, deixa uma estrela!
-
-**🌐 [Live Demo](https://java-multiverse-explorer.vercel.app/)** | **📖 [API Docs](https://multiverse-explorer-api.onrender.com/swagger-ui.html)**
-
-[⬆ Voltar ao topo](#-multiverse-data-explorer)
-
-</div>
+📄 Licença MIT
